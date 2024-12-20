@@ -9,16 +9,45 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        ZStack {
+            Color(red: 253/255, green: 241/255, blue: 217/255)
+                .edgesIgnoringSafeArea(.all)
+            VStack{
+                Text("Zenith")
+                    .font(.system(size:32, weight: .medium, design: .default))
+                    .foregroundColor(.black)
+                VStack{
+                    Image(systemName: "globe")
+                        .renderingMode(.original)
+                        .resizable()
+                        .frame(width: 180, height: 180)
+                        .colorInvert()
+                }
+                Spacer()
+                VStack{
+                    Text("Your Journey to Digital Wellbeing Starts Here")
+                        .font(.system(size:24, weight: .medium, design: .default))
+                        .foregroundColor(.black)
+                        .padding()
+                        .multilineTextAlignment(.center)
+                }
+                Spacer()
+            }
         }
-        .padding()
     }
 }
+
+
+
+//struct ContentView_Previews:
+//    PreviewProvider{
+//    static var previews: some View{
+//        ContentView()
+//    }
+//}
 
 #Preview {
     ContentView()
 }
+
+
