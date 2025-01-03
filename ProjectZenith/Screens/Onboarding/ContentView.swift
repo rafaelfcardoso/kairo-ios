@@ -10,28 +10,24 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         ZStack {
-            Color(red: 253/255, green: 241/255, blue: 217/255)
-                .edgesIgnoringSafeArea(.all)
             VStack{
-                Text("Zenith")
-                    .font(.system(size:32, weight: .medium, design: .default))
-                    .foregroundColor(.black)
-                VStack{
+                ZStack{
+                    RoundedRectangle(cornerRadius: 30)
+                        .frame(width: 150, height: 150)
+                        .foregroundStyle(.tint)
                     Image(systemName: "globe")
                         .renderingMode(.original)
-                        .resizable()
-                        .frame(width: 180, height: 180)
-                        .colorInvert()
+                        .font(.system(size: 100))
+                        .foregroundStyle(.white)
                 }
-                Spacer()
+                Text("Welcome to Zenith")
+                    .font(.title)
+                    .fontWeight(.semibold)
                 VStack{
                     Text("Your Journey to Digital Wellbeing Starts Here")
-                        .font(.system(size:24, weight: .medium, design: .default))
-                        .foregroundColor(.black)
-                        .padding()
+                        .font(.title2)
                         .multilineTextAlignment(.center)
                 }
-                Spacer()
             }
         }
     }
