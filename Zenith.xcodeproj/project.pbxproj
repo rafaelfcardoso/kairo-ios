@@ -30,9 +30,9 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		536362142D13028700672C90 /* ProjectZenith */ = {
+		536362142D13028700672C90 /* Zenith */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = ProjectZenith;
+			path = Zenith;
 			sourceTree = "<group>";
 		};
 		536362262D13028900672C90 /* ProjectZenithTests */ = {
@@ -75,7 +75,7 @@
 		536362092D13028700672C90 = {
 			isa = PBXGroup;
 			children = (
-				536362142D13028700672C90 /* ProjectZenith */,
+				536362142D13028700672C90 /* Zenith */,
 				536362262D13028900672C90 /* ProjectZenithTests */,
 				536362302D13028900672C90 /* ProjectZenithUITests */,
 				536362132D13028700672C90 /* Products */,
@@ -108,7 +108,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				536362142D13028700672C90 /* ProjectZenith */,
+				536362142D13028700672C90 /* Zenith */,
 			);
 			name = ProjectZenith;
 			packageProductDependencies = (
