@@ -10,11 +10,28 @@ import SwiftUI
 struct MainView: View {
     @StateObject private var viewModel = TaskViewModel()
     @State private var showingCreateTask = false
+    @Environment(\.colorScheme) var colorScheme
+    
+    var backgroundColor: Color {
+        colorScheme == .dark ? .black : .white
+    }
+    
+    var textColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+    
+    var secondaryTextColor: Color {
+        colorScheme == .dark ? .gray : .secondary
+    }
+    
+    var cardBackgroundColor: Color {
+        colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.95)
+    }
     
     var body: some View {
         NavigationView {
             ZStack {
-                Color.black.edgesIgnoringSafeArea(.all)
+                backgroundColor.edgesIgnoringSafeArea(.all)
                 
                 VStack(spacing: 16) {
                     // Header section
@@ -22,11 +39,11 @@ struct MainView: View {
                         Text("Hoje")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                            .foregroundColor(.white)
+                            .foregroundColor(textColor)
                         
                         Text("Domingo - 5 Jan")
                             .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(secondaryTextColor)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal)
@@ -45,10 +62,10 @@ struct MainView: View {
                                     Image(systemName: "plus")
                                     Text("Adicionar tarefa")
                                 }
-                                .foregroundColor(.gray)
+                                .foregroundColor(secondaryTextColor)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding()
-                                .background(Color.black)
+                                .background(cardBackgroundColor)
                                 .cornerRadius(8)
                             }
                             .sheet(isPresented: $showingCreateTask) {
@@ -65,10 +82,10 @@ struct MainView: View {
                         print("Focus Session Started")
                     }) {
                         Text("Iniciar Foco")
-                            .foregroundColor(.black)
+                            .foregroundColor(backgroundColor)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .background(Color.white)
+                            .background(textColor)
                             .font(.system(size: 16, weight: .semibold))
                             .cornerRadius(12)
                     }
@@ -79,7 +96,7 @@ struct MainView: View {
             .toolbar {
                 ToolbarItem(placement: .automatic) {
                     Text("Energia Mental")
-                        .foregroundColor(.gray)
+                        .foregroundColor(secondaryTextColor)
                         .font(.subheadline)
                 }
             }
@@ -93,21 +110,34 @@ struct MainView: View {
 // Task row component
 struct TaskRow: View {
     let task: Task
+    @Environment(\.colorScheme) var colorScheme
+    
+    var cardBackgroundColor: Color {
+        colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.95)
+    }
+    
+    var textColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+    
+    var secondaryTextColor: Color {
+        colorScheme == .dark ? .gray : .secondary
+    }
     
     var body: some View {
         HStack {
             Circle()
-                .strokeBorder(Color.gray, lineWidth: 1.5)
+                .strokeBorder(secondaryTextColor, lineWidth: 1.5)
                 .frame(width: 24, height: 24)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(task.title)
-                    .foregroundColor(.white)
+                    .foregroundColor(textColor)
                 
                 if let description = task.description {
                     Text(description)
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(secondaryTextColor)
                 }
                 
                 HStack(spacing: 8) {
@@ -122,14 +152,14 @@ struct TaskRow: View {
                     
                     Text(task.priority)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(secondaryTextColor)
                 }
             }
             
             Spacer()
         }
         .padding()
-        .background(Color(white: 0.1))
+        .background(cardBackgroundColor)
         .cornerRadius(8)
     }
 }
@@ -137,5 +167,6 @@ struct TaskRow: View {
 struct MainView_Previews: PreviewProvider {
     static var previews: some View {
         MainView()
+            .previewDisplayName("Main View")
     }
 } 
