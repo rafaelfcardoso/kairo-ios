@@ -1,6 +1,6 @@
 //
 //  MainView.swift
-//  ProjectZenith
+//  Zenith
 //
 //  Created by Rafael Cardoso on 02/01/25.
 //
@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct MainView: View {
+    @State private var showingCreateTask = false
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -35,7 +37,7 @@ struct MainView: View {
                         TaskRow(title: "Ritual Diário de Desconexão", subtitle: "Trabalho Pessoal")
                         
                         Button(action: {
-                            // Add task action
+                            showingCreateTask = true
                         }) {
                             HStack {
                                 Image(systemName: "plus")
@@ -46,6 +48,9 @@ struct MainView: View {
                             .padding()
                             .background(Color.black)
                             .cornerRadius(8)
+                        }
+                        .sheet(isPresented: $showingCreateTask) {
+                            CreateTaskView()
                         }
                     }
                     .padding(.horizontal)

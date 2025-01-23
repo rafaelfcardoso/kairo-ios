@@ -24,9 +24,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		536362122D13028700672C90 /* ProjectZenith.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ProjectZenith.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		536362232D13028900672C90 /* ProjectZenithTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ProjectZenithTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		5363622D2D13028900672C90 /* ProjectZenithUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ProjectZenithUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		536362122D13028700672C90 /* Zenith.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zenith.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		536362232D13028900672C90 /* ZenithTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZenithTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5363622D2D13028900672C90 /* ZenithUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZenithUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -35,14 +35,14 @@
 			path = Zenith;
 			sourceTree = "<group>";
 		};
-		536362262D13028900672C90 /* ProjectZenithTests */ = {
+		536362262D13028900672C90 /* ZenithTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = ProjectZenithTests;
+			path = ZenithTests;
 			sourceTree = "<group>";
 		};
-		536362302D13028900672C90 /* ProjectZenithUITests */ = {
+		536362302D13028900672C90 /* ZenithUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = ProjectZenithUITests;
+			path = ZenithUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -76,8 +76,8 @@
 			isa = PBXGroup;
 			children = (
 				536362142D13028700672C90 /* Zenith */,
-				536362262D13028900672C90 /* ProjectZenithTests */,
-				536362302D13028900672C90 /* ProjectZenithUITests */,
+				536362262D13028900672C90 /* ZenithTests */,
+				536362302D13028900672C90 /* ZenithUITests */,
 				536362132D13028700672C90 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -85,9 +85,9 @@
 		536362132D13028700672C90 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				536362122D13028700672C90 /* ProjectZenith.app */,
-				536362232D13028900672C90 /* ProjectZenithTests.xctest */,
-				5363622D2D13028900672C90 /* ProjectZenithUITests.xctest */,
+				536362122D13028700672C90 /* Zenith.app */,
+				536362232D13028900672C90 /* ZenithTests.xctest */,
+				5363622D2D13028900672C90 /* ZenithUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,9 +95,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		536362112D13028700672C90 /* ProjectZenith */ = {
+		536362112D13028700672C90 /* Zenith */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 536362372D13028900672C90 /* Build configuration list for PBXNativeTarget "ProjectZenith" */;
+			buildConfigurationList = 536362372D13028900672C90 /* Build configuration list for PBXNativeTarget "Zenith" */;
 			buildPhases = (
 				5363620E2D13028700672C90 /* Sources */,
 				5363620F2D13028700672C90 /* Frameworks */,
@@ -110,16 +110,16 @@
 			fileSystemSynchronizedGroups = (
 				536362142D13028700672C90 /* Zenith */,
 			);
-			name = ProjectZenith;
+			name = Zenith;
 			packageProductDependencies = (
 			);
 			productName = ProjectZenith;
-			productReference = 536362122D13028700672C90 /* ProjectZenith.app */;
+			productReference = 536362122D13028700672C90 /* Zenith.app */;
 			productType = "com.apple.product-type.application";
 		};
-		536362222D13028900672C90 /* ProjectZenithTests */ = {
+		536362222D13028900672C90 /* ZenithTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 5363623A2D13028900672C90 /* Build configuration list for PBXNativeTarget "ProjectZenithTests" */;
+			buildConfigurationList = 5363623A2D13028900672C90 /* Build configuration list for PBXNativeTarget "ZenithTests" */;
 			buildPhases = (
 				5363621F2D13028900672C90 /* Sources */,
 				536362202D13028900672C90 /* Frameworks */,
@@ -131,18 +131,18 @@
 				536362252D13028900672C90 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				536362262D13028900672C90 /* ProjectZenithTests */,
+				536362262D13028900672C90 /* ZenithTests */,
 			);
-			name = ProjectZenithTests;
+			name = ZenithTests;
 			packageProductDependencies = (
 			);
 			productName = ProjectZenithTests;
-			productReference = 536362232D13028900672C90 /* ProjectZenithTests.xctest */;
+			productReference = 536362232D13028900672C90 /* ZenithTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		5363622C2D13028900672C90 /* ProjectZenithUITests */ = {
+		5363622C2D13028900672C90 /* ZenithUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 5363623D2D13028900672C90 /* Build configuration list for PBXNativeTarget "ProjectZenithUITests" */;
+			buildConfigurationList = 5363623D2D13028900672C90 /* Build configuration list for PBXNativeTarget "ZenithUITests" */;
 			buildPhases = (
 				536362292D13028900672C90 /* Sources */,
 				5363622A2D13028900672C90 /* Frameworks */,
@@ -154,13 +154,13 @@
 				5363622F2D13028900672C90 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				536362302D13028900672C90 /* ProjectZenithUITests */,
+				536362302D13028900672C90 /* ZenithUITests */,
 			);
-			name = ProjectZenithUITests;
+			name = ZenithUITests;
 			packageProductDependencies = (
 			);
 			productName = ProjectZenithUITests;
-			productReference = 5363622D2D13028900672C90 /* ProjectZenithUITests.xctest */;
+			productReference = 5363622D2D13028900672C90 /* ZenithUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -186,7 +186,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 5363620D2D13028700672C90 /* Build configuration list for PBXProject "ProjectZenith" */;
+			buildConfigurationList = 5363620D2D13028700672C90 /* Build configuration list for PBXProject "Zenith" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -200,9 +200,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				536362112D13028700672C90 /* ProjectZenith */,
-				536362222D13028900672C90 /* ProjectZenithTests */,
-				5363622C2D13028900672C90 /* ProjectZenithUITests */,
+				536362112D13028700672C90 /* Zenith */,
+				536362222D13028900672C90 /* ZenithTests */,
+				5363622C2D13028900672C90 /* ZenithUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -258,12 +258,12 @@
 /* Begin PBXTargetDependency section */
 		536362252D13028900672C90 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 536362112D13028700672C90 /* ProjectZenith */;
+			target = 536362112D13028700672C90 /* Zenith */;
 			targetProxy = 536362242D13028900672C90 /* PBXContainerItemProxy */;
 		};
 		5363622F2D13028900672C90 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 536362112D13028700672C90 /* ProjectZenith */;
+			target = 536362112D13028700672C90 /* Zenith */;
 			targetProxy = 5363622E2D13028900672C90 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -388,14 +388,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = ProjectZenith/ProjectZenith.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"ProjectZenith/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Zenith/Preview Content\"";
 				DEVELOPMENT_TEAM = R6D88M7438;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -411,8 +413,9 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = Zenith.ProjectZenith;
+				PRODUCT_BUNDLE_IDENTIFIER = io.zenith.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -427,14 +430,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = ProjectZenith/ProjectZenith.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"ProjectZenith/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Zenith/Preview Content\"";
 				DEVELOPMENT_TEAM = R6D88M7438;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -450,8 +455,9 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = Zenith.ProjectZenith;
+				PRODUCT_BUNDLE_IDENTIFIER = io.zenith.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -554,7 +560,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		5363620D2D13028700672C90 /* Build configuration list for PBXProject "ProjectZenith" */ = {
+		5363620D2D13028700672C90 /* Build configuration list for PBXProject "Zenith" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				536362352D13028900672C90 /* Debug */,
@@ -563,7 +569,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		536362372D13028900672C90 /* Build configuration list for PBXNativeTarget "ProjectZenith" */ = {
+		536362372D13028900672C90 /* Build configuration list for PBXNativeTarget "Zenith" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				536362382D13028900672C90 /* Debug */,
@@ -572,7 +578,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		5363623A2D13028900672C90 /* Build configuration list for PBXNativeTarget "ProjectZenithTests" */ = {
+		5363623A2D13028900672C90 /* Build configuration list for PBXNativeTarget "ZenithTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5363623B2D13028900672C90 /* Debug */,
@@ -581,7 +587,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		5363623D2D13028900672C90 /* Build configuration list for PBXNativeTarget "ProjectZenithUITests" */ = {
+		5363623D2D13028900672C90 /* Build configuration list for PBXNativeTarget "ZenithUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5363623E2D13028900672C90 /* Debug */,
