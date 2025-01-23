@@ -70,6 +70,10 @@ struct MainView: View {
                             }
                             .sheet(isPresented: $showingCreateTask) {
                                 CreateTaskView()
+                                    .interactiveDismissDisabled(false)
+                                    .presentationBackground(
+                                        colorScheme == .dark ? Color(white: 0.17) : Color(white: 0.94)
+                                    )
                             }
                         }
                         .padding(.horizontal)

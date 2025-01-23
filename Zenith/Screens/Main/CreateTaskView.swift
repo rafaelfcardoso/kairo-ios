@@ -9,7 +9,7 @@ struct CreateTaskView: View {
     @State private var selectedPriority: Bool = false
     
     var backgroundColor: Color {
-        colorScheme == .dark ? .black : .white
+        colorScheme == .dark ? Color(white: 0.13) : .white
     }
     
     var textColor: Color {
@@ -21,57 +21,68 @@ struct CreateTaskView: View {
     }
     
     var cardBackgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.95)
+        colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.90)
+    }
+    
+    var statusBarBackgroundColor: Color {
+        colorScheme == .dark ? Color(white: 0.15) : Color(white: 0.95)
+    }
+    
+    var modalBackgroundColor: Color {
+        colorScheme == .dark ? Color(white: 0.17) : Color(white: 0.94)
     }
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                TextField("Nome da tarefa", text: $taskName)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .foregroundColor(textColor)
+            ZStack {
+                modalBackgroundColor.ignoresSafeArea()
                 
-                TextField("Descrição", text: $taskDescription)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .foregroundColor(textColor)
-                
-                HStack {
-                    Image(systemName: "calendar")
-                    Text("Hoje")
+                VStack(spacing: 20) {
+                    TextField("Nome da tarefa", text: $taskName)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .foregroundColor(textColor)
+                    
+                    TextField("Descrição", text: $taskDescription)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .foregroundColor(textColor)
+                    
+                    HStack {
+                        Image(systemName: "calendar")
+                        Text("Hoje")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundColor(secondaryTextColor)
+                    .padding()
+                    .background(cardBackgroundColor)
+                    .cornerRadius(8)
+                    
+                    HStack {
+                        Image(systemName: "clock")
+                        Text("Sessões")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundColor(secondaryTextColor)
+                    .padding()
+                    .background(cardBackgroundColor)
+                    .cornerRadius(8)
+                    
+                    HStack {
+                        Image(systemName: "flag")
+                        Text("Prioridade")
+                        Spacer()
+                        Toggle("", isOn: $selectedPriority)
+                    }
+                    .foregroundColor(secondaryTextColor)
+                    .padding()
+                    .background(cardBackgroundColor)
+                    .cornerRadius(8)
+                    
                     Spacer()
-                    Image(systemName: "chevron.right")
                 }
-                .foregroundColor(secondaryTextColor)
                 .padding()
-                .background(cardBackgroundColor)
-                .cornerRadius(8)
-                
-                HStack {
-                    Image(systemName: "clock")
-                    Text("Sessões")
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                }
-                .foregroundColor(secondaryTextColor)
-                .padding()
-                .background(cardBackgroundColor)
-                .cornerRadius(8)
-                
-                HStack {
-                    Image(systemName: "flag")
-                    Text("Prioridade")
-                    Spacer()
-                    Toggle("", isOn: $selectedPriority)
-                }
-                .foregroundColor(secondaryTextColor)
-                .padding()
-                .background(cardBackgroundColor)
-                .cornerRadius(8)
-                
-                Spacer()
             }
-            .padding()
-            .background(backgroundColor)
             .navigationTitle("Nova Tarefa")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -91,6 +102,11 @@ struct CreateTaskView: View {
                 }
             }
         }
+        .navigationViewStyle(.stack)
+        .preferredColorScheme(colorScheme)
+        .presentationDragIndicator(.visible)
+        .presentationDetents([.large])
+        .background(.clear)
     }
 }
 
