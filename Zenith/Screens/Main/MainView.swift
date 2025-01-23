@@ -10,6 +10,8 @@ import SwiftUI
 struct MainView: View {
     @StateObject private var viewModel = TaskViewModel()
     @State private var showingCreateTask = false
+    @State private var isLoading = true
+    @State private var hasError = false
     @Environment(\.colorScheme) var colorScheme
     
     var backgroundColor: Color {
@@ -33,68 +35,104 @@ struct MainView: View {
             ZStack {
                 backgroundColor.edgesIgnoringSafeArea(.all)
                 
-                VStack(spacing: 16) {
-                    // Header section
-                    VStack(alignment: .leading) {
-                        Text("Hoje")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
+                if isLoading {
+                    ProgressView()
+                } else if hasError {
+                    VStack(spacing: 16) {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 40))
+                            .foregroundColor(secondaryTextColor)
+                        
+                        Text("Não foi possível carregar as tarefas")
+                            .font(.headline)
                             .foregroundColor(textColor)
                         
-                        Text("Domingo - 5 Jan")
+                        Text("Verifique sua conexão e tente novamente")
                             .font(.subheadline)
                             .foregroundColor(secondaryTextColor)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                    
-                    // Tasks list
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(viewModel.tasks) { task in
-                                TaskRow(task: task)
-                            }
-                            
-                            Button(action: {
-                                showingCreateTask = true
-                            }) {
-                                HStack {
-                                    Image(systemName: "plus")
-                                    Text("Adicionar tarefa")
-                                }
-                                .foregroundColor(secondaryTextColor)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding()
-                                .background(cardBackgroundColor)
-                                .cornerRadius(8)
-                            }
-                            .sheet(isPresented: $showingCreateTask) {
-                                CreateTaskView()
-                                    .interactiveDismissDisabled(false)
-                                    .presentationBackground(
-                                        colorScheme == .dark ? Color(white: 0.17) : Color(white: 0.94)
-                                    )
+                            .multilineTextAlignment(.center)
+                        
+                        Button(action: {
+                            isLoading = true
+                            hasError = false
+                        }) {
+                            Text("Tentar novamente")
+                                .foregroundColor(.blue)
+                        }
+                        .padding(.top, 8)
+                        .task {
+                            do {
+                                try await viewModel.loadTasks()
+                            } catch {
+                                hasError = true
                             }
                         }
+                    }
+                    .padding()
+                } else {
+                    VStack(spacing: 16) {
+                        // Header section
+                        VStack(alignment: .leading) {
+                            Text("Hoje")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                                .foregroundColor(textColor)
+                            
+                            Text("Domingo - 5 Jan")
+                                .font(.subheadline)
+                                .foregroundColor(secondaryTextColor)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal)
+                        
+                        // Tasks list
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                ForEach(viewModel.tasks) { task in
+                                    TaskRow(task: task)
+                                }
+                                
+                                Button(action: {
+                                    showingCreateTask = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "plus")
+                                        Text("Adicionar tarefa")
+                                    }
+                                    .foregroundColor(secondaryTextColor)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding()
+                                    .background(cardBackgroundColor)
+                                    .cornerRadius(8)
+                                }
+                                .sheet(isPresented: $showingCreateTask) {
+                                    CreateTaskView()
+                                        .interactiveDismissDisabled(false)
+                                        .presentationBackground(
+                                            colorScheme == .dark ? Color(white: 0.17) : Color(white: 0.94)
+                                        )
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                        
+                        Spacer()
+                        
+                        // Start focus button
+                        Button(action: {
+                            print("Focus Session Started")
+                        }) {
+                            Text("Iniciar Foco")
+                                .foregroundColor(backgroundColor)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(textColor)
+                                .font(.system(size: 16, weight: .semibold))
+                                .cornerRadius(12)
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom)
                     }
-                    
-                    Spacer()
-                    
-                    // Start focus button
-                    Button(action: {
-                        print("Focus Session Started")
-                    }) {
-                        Text("Iniciar Foco")
-                            .foregroundColor(backgroundColor)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(textColor)
-                            .font(.system(size: 16, weight: .semibold))
-                            .cornerRadius(12)
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom)
                 }
             }
             .toolbar {
@@ -104,9 +142,25 @@ struct MainView: View {
                         .font(.subheadline)
                 }
             }
-            .onAppear {
-                viewModel.fetchTasks()
+            .task {
+                do {
+                    isLoading = true
+                    try await viewModel.loadTasks()
+                    isLoading = false
+                } catch {
+                    isLoading = false
+                    hasError = true
+                }
             }
+            .refreshable {
+                do {
+                    hasError = false
+                    try await viewModel.loadTasks(isRefreshing: true)
+                } catch {
+                    hasError = true
+                }
+            }
+            .navigationTitle("Tasks")
         }
     }
 }
@@ -128,10 +182,23 @@ struct TaskRow: View {
         colorScheme == .dark ? .gray : .secondary
     }
     
+    var circleColor: Color {
+        switch task.priority.lowercased() {
+        case "high":
+            return .red
+        case "medium":
+            return .yellow
+        case "low":
+            return .blue
+        default:
+            return secondaryTextColor
+        }
+    }
+    
     var body: some View {
         HStack {
             Circle()
-                .strokeBorder(secondaryTextColor, lineWidth: 1.5)
+                .strokeBorder(circleColor, lineWidth: 1.5)
                 .frame(width: 24, height: 24)
             
             VStack(alignment: .leading, spacing: 4) {
