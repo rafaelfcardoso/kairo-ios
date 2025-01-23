@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct MainView: View {
+    @StateObject private var viewModel = TaskViewModel()
     @State private var showingCreateTask = false
     
     var body: some View {
@@ -31,29 +32,31 @@ struct MainView: View {
                     .padding(.horizontal)
                     
                     // Tasks list
-                    VStack(spacing: 12) {
-                        TaskRow(title: "Reunião com Time")
-                        TaskRow(title: "Documentação")
-                        TaskRow(title: "Ritual Diário de Desconexão", subtitle: "Trabalho Pessoal")
-                        
-                        Button(action: {
-                            showingCreateTask = true
-                        }) {
-                            HStack {
-                                Image(systemName: "plus")
-                                Text("Adicionar tarefa")
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            ForEach(viewModel.tasks) { task in
+                                TaskRow(task: task)
                             }
-                            .foregroundColor(.gray)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                            .background(Color.black)
-                            .cornerRadius(8)
+                            
+                            Button(action: {
+                                showingCreateTask = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "plus")
+                                    Text("Adicionar tarefa")
+                                }
+                                .foregroundColor(.gray)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                                .background(Color.black)
+                                .cornerRadius(8)
+                            }
+                            .sheet(isPresented: $showingCreateTask) {
+                                CreateTaskView()
+                            }
                         }
-                        .sheet(isPresented: $showingCreateTask) {
-                            CreateTaskView()
-                        }
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
                     
                     Spacer()
                     
@@ -80,14 +83,16 @@ struct MainView: View {
                         .font(.subheadline)
                 }
             }
+            .onAppear {
+                viewModel.fetchTasks()
+            }
         }
     }
 }
 
 // Task row component
 struct TaskRow: View {
-    let title: String
-    var subtitle: String? = nil
+    let task: Task
     
     var body: some View {
         HStack {
@@ -96,11 +101,27 @@ struct TaskRow: View {
                 .frame(width: 24, height: 24)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
+                Text(task.title)
                     .foregroundColor(.white)
-                if let subtitle = subtitle {
-                    Text(subtitle)
+                
+                if let description = task.description {
+                    Text(description)
                         .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+                
+                HStack(spacing: 8) {
+                    if let project = task.project {
+                        Text(project.name)
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(hex: project.color).opacity(0.2))
+                            .cornerRadius(4)
+                    }
+                    
+                    Text(task.priority)
+                        .font(.caption)
                         .foregroundColor(.gray)
                 }
             }
@@ -117,5 +138,4 @@ struct MainView_Previews: PreviewProvider {
     static var previews: some View {
         MainView()
     }
-}
-
+} 
