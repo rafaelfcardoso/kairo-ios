@@ -73,11 +73,6 @@ struct MainView: View {
                     VStack(spacing: 16) {
                         // Header section
                         VStack(alignment: .leading) {
-                            Text("Hoje")
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                                .foregroundColor(textColor)
-                            
                             Text("Domingo - 5 Jan")
                                 .font(.subheadline)
                                 .foregroundColor(secondaryTextColor)
@@ -103,7 +98,7 @@ struct MainView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding()
                                     .background(cardBackgroundColor)
-                                    .cornerRadius(8)
+                                    .cornerRadius(12)
                                 }
                                 .sheet(isPresented: $showingCreateTask) {
                                     CreateTaskView()
@@ -128,7 +123,7 @@ struct MainView: View {
                                 .frame(height: 50)
                                 .background(textColor)
                                 .font(.system(size: 16, weight: .semibold))
-                                .cornerRadius(12)
+                                .cornerRadius(25)
                         }
                         .padding(.horizontal)
                         .padding(.bottom)
@@ -160,7 +155,8 @@ struct MainView: View {
                     hasError = true
                 }
             }
-            .navigationTitle("Tasks")
+            .navigationTitle("Hoje")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
@@ -196,10 +192,11 @@ struct TaskRow: View {
     }
     
     var body: some View {
-        HStack {
+        HStack(alignment: .top, spacing: 16) {
             Circle()
                 .strokeBorder(circleColor, lineWidth: 1.5)
-                .frame(width: 24, height: 24)
+                .frame(width: 24, height: 20)
+                .padding(.top, 4)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(task.title)
@@ -207,8 +204,8 @@ struct TaskRow: View {
                 
                 if let description = task.description {
                     Text(description)
-                        .font(.subheadline)
                         .foregroundColor(secondaryTextColor)
+                        .font(.subheadline)
                 }
                 
                 HStack(spacing: 8) {
@@ -220,10 +217,6 @@ struct TaskRow: View {
                             .background(Color(hex: project.color).opacity(0.2))
                             .cornerRadius(4)
                     }
-                    
-                    Text(task.priority)
-                        .font(.caption)
-                        .foregroundColor(secondaryTextColor)
                 }
             }
             
@@ -231,7 +224,7 @@ struct TaskRow: View {
         }
         .padding()
         .background(cardBackgroundColor)
-        .cornerRadius(8)
+        .cornerRadius(12)
     }
 }
 
