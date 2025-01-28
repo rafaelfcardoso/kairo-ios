@@ -5,11 +5,9 @@ struct CreateTaskView: View {
     @Environment(\.colorScheme) var colorScheme
     @State private var taskName: String = ""
     @State private var taskDescription: String = ""
-    @State private var selectedDate: Date = Date()
-    @State private var selectedPriority: Bool = false
     
     var backgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.13) : .white
+        colorScheme == .dark ? Color(hex: "1F1F1F") : Color(white: 0.94)
     }
     
     var textColor: Color {
@@ -20,93 +18,66 @@ struct CreateTaskView: View {
         colorScheme == .dark ? .gray : .secondary
     }
     
-    var cardBackgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.90)
-    }
-    
-    var statusBarBackgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.15) : Color(white: 0.95)
-    }
-    
-    var modalBackgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.17) : Color(white: 0.94)
-    }
-    
     var body: some View {
-        NavigationView {
-            ZStack {
-                modalBackgroundColor.ignoresSafeArea()
-                
-                VStack(spacing: 20) {
-                    TextField("Nome da tarefa", text: $taskName)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .foregroundColor(textColor)
-                    
-                    TextField("Descrição", text: $taskDescription)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .foregroundColor(textColor)
-                    
-                    HStack {
-                        Image(systemName: "calendar")
-                        Text("Hoje")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .foregroundColor(secondaryTextColor)
-                    .padding()
-                    .background(cardBackgroundColor)
-                    .cornerRadius(8)
-                    
-                    HStack {
-                        Image(systemName: "clock")
-                        Text("Sessões")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .foregroundColor(secondaryTextColor)
-                    .padding()
-                    .background(cardBackgroundColor)
-                    .cornerRadius(8)
-                    
-                    HStack {
-                        Image(systemName: "flag")
-                        Text("Prioridade")
-                        Spacer()
-                        Toggle("", isOn: $selectedPriority)
-                    }
-                    .foregroundColor(secondaryTextColor)
-                    .padding()
-                    .background(cardBackgroundColor)
-                    .cornerRadius(8)
-                    
-                    Spacer()
-                }
-                .padding()
-            }
-            .navigationTitle("Nova Tarefa")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancelar") {
-                        dismiss()
-                    }
+        ZStack {
+            backgroundColor.ignoresSafeArea()
+            
+            VStack(alignment: .leading, spacing: 16) {
+                TextField("Nome da tarefa", text: $taskName)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 20, weight: .medium, design: .default))
                     .foregroundColor(textColor)
-                }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Adicionar") {
-                        // Add task logic here
-                        dismiss()
-                    }
+                TextField("Descrição", text: $taskDescription)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 17, weight: .regular, design: .default))
                     .foregroundColor(textColor)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        Button(action: {}) {
+                            HStack {
+                                Image(systemName: "tray")
+                                Text("Entrada")
+                                    .font(.system(size: 15, weight: .regular, design: .default))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.gray.opacity(0.2))
+                            .cornerRadius(8)
+                            .foregroundColor(textColor)
+                        }
+                        
+                        Button(action: {}) {
+                            HStack {
+                                Image(systemName: "calendar")
+                                Text("Hoje")
+                                    .font(.system(size: 15, weight: .regular, design: .default))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.green.opacity(0.2))
+                            .cornerRadius(8)
+                            .foregroundColor(textColor)
+                        }
+                        
+                        Button(action: {}) {
+                            HStack {
+                                Image(systemName: "flag")
+                                Text("Prioridade")
+                                    .font(.system(size: 15, weight: .regular, design: .default))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.orange.opacity(0.2))
+                            .cornerRadius(8)
+                            .foregroundColor(textColor)
+                        }
+                    }
                 }
             }
+            .padding(20)
         }
-        .navigationViewStyle(.stack)
-        .preferredColorScheme(colorScheme)
-        .presentationDragIndicator(.visible)
-        .presentationDetents([.large])
-        .background(.clear)
     }
 }
 
