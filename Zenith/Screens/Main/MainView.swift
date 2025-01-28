@@ -7,6 +7,89 @@
 
 import SwiftUI
 
+// Error View Component
+struct ErrorView: View {
+    let secondaryTextColor: Color
+    let textColor: Color
+    let retryAction: () -> Void
+    @State private var shouldRetry = false
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 40))
+                .foregroundColor(secondaryTextColor)
+            
+            Text("Não foi possível carregar as tarefas")
+                .font(.headline)
+                .foregroundColor(textColor)
+            
+            Text("Verifique sua conexão e tente novamente")
+                .font(.subheadline)
+                .foregroundColor(secondaryTextColor)
+                .multilineTextAlignment(.center)
+            
+            Button(action: {
+                shouldRetry = true
+                retryAction()
+            }) {
+                Text("Tentar novamente")
+                    .foregroundColor(.blue)
+            }
+            .padding(.top, 8)
+        }
+        .padding()
+    }
+}
+
+// Task List Component
+struct TaskListView: View {
+    @Binding var showingCreateTask: Bool
+    let tasks: [Task]
+    let secondaryTextColor: Color
+    let cardBackgroundColor: Color
+    let onTaskCreated: @Sendable () async -> Void
+    @State private var shouldRefresh = false
+    
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(tasks) { task in
+                    TaskRow(task: task)
+                }
+                
+                Button(action: {
+                    showingCreateTask = true
+                }) {
+                    HStack {
+                        Image(systemName: "plus")
+                        Text("Adicionar tarefa")
+                    }
+                    .foregroundColor(secondaryTextColor)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(cardBackgroundColor)
+                    .cornerRadius(12)
+                }
+                .sheet(isPresented: $showingCreateTask) {
+                    CreateTaskView(onTaskCreated: {
+                        await MainActor.run {
+                            shouldRefresh = true
+                        }
+                        await onTaskCreated()
+                        await MainActor.run {
+                            shouldRefresh = false
+                        }
+                    })
+                    .presentationDetents([.height(250)])
+                    .presentationDragIndicator(.visible)
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+}
+
 struct MainView: View {
     @StateObject private var viewModel = TaskViewModel()
     @State private var showingCreateTask = false
@@ -38,37 +121,21 @@ struct MainView: View {
                 if isLoading {
                     ProgressView()
                 } else if hasError {
-                    VStack(spacing: 16) {
-                        Image(systemName: "wifi.slash")
-                            .font(.system(size: 40))
-                            .foregroundColor(secondaryTextColor)
-                        
-                        Text("Não foi possível carregar as tarefas")
-                            .font(.headline)
-                            .foregroundColor(textColor)
-                        
-                        Text("Verifique sua conexão e tente novamente")
-                            .font(.subheadline)
-                            .foregroundColor(secondaryTextColor)
-                            .multilineTextAlignment(.center)
-                        
-                        Button(action: {
+                    ErrorView(
+                        secondaryTextColor: secondaryTextColor,
+                        textColor: textColor,
+                        retryAction: {
                             isLoading = true
                             hasError = false
-                        }) {
-                            Text("Tentar novamente")
-                                .foregroundColor(.blue)
                         }
-                        .padding(.top, 8)
-                        .task {
-                            do {
-                                try await viewModel.loadTasks()
-                            } catch {
-                                hasError = true
-                            }
+                    )
+                    .task {
+                        do {
+                            try await viewModel.loadTasks()
+                        } catch {
+                            hasError = true
                         }
                     }
-                    .padding()
                 } else {
                     VStack(spacing: 16) {
                         // Header section
@@ -80,34 +147,15 @@ struct MainView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal)
                         
-                        // Tasks list
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(viewModel.tasks) { task in
-                                    TaskRow(task: task)
-                                }
-                                
-                                Button(action: {
-                                    showingCreateTask = true
-                                }) {
-                                    HStack {
-                                        Image(systemName: "plus")
-                                        Text("Adicionar tarefa")
-                                    }
-                                    .foregroundColor(secondaryTextColor)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding()
-                                    .background(cardBackgroundColor)
-                                    .cornerRadius(12)
-                                }
-                                .sheet(isPresented: $showingCreateTask) {
-                                    CreateTaskView()
-                                        .presentationDetents([.height(250)])
-                                        .presentationDragIndicator(.visible)
-                                }
+                        TaskListView(
+                            showingCreateTask: $showingCreateTask,
+                            tasks: viewModel.tasks,
+                            secondaryTextColor: secondaryTextColor,
+                            cardBackgroundColor: cardBackgroundColor,
+                            onTaskCreated: {
+                                await viewModel.refreshTasks()
                             }
-                            .padding(.horizontal)
-                        }
+                        )
                         
                         Spacer()
                         
