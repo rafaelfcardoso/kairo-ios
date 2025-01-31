@@ -253,13 +253,15 @@ struct TaskRow: View {
     
     private var formattedTime: String? {
         guard let dueDateString = task.dueDate else {
+            print("Debug: No due date string available")
             return nil
         }
         
         let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         
         guard let dueDate = formatter.date(from: dueDateString) else {
+            print("Debug: Could not parse date from string: \(dueDateString)")
             return nil
         }
         
@@ -269,13 +271,16 @@ struct TaskRow: View {
         let minute = calendar.component(.minute, from: dueDate)
         
         if hour == 0 && minute == 0 {
+            print("Debug: Time is midnight (00:00), not showing time")
             return nil
         }
         
         let timeFormatter = DateFormatter()
         timeFormatter.timeStyle = .short
         timeFormatter.dateStyle = .none
-        return timeFormatter.string(from: dueDate)
+        let formattedResult = timeFormatter.string(from: dueDate)
+        print("Debug: Formatted time: \(formattedResult)")
+        return formattedResult
     }
     
     var body: some View {
@@ -325,6 +330,16 @@ struct TaskRow: View {
                 }
                 
                 HStack(spacing: 8) {
+                    if let time = formattedTime {
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 12))
+                            Text(time)
+                                .font(.caption)
+                        }
+                        .padding(.vertical, 4)
+                        .foregroundColor(.green)
+                    }
                     if task.project == nil {
                         HStack(spacing: 4) {
                             Image(systemName: "tray")
@@ -334,8 +349,6 @@ struct TaskRow: View {
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.gray.opacity(0.2))
-                        .cornerRadius(4)
                         .foregroundColor(secondaryTextColor)
                     } else if let project = task.project {
                         Text(project.name)
@@ -344,20 +357,6 @@ struct TaskRow: View {
                             .padding(.vertical, 4)
                             .background(Color(hex: project.color).opacity(0.2))
                             .cornerRadius(4)
-                    }
-                    
-                    if let time = formattedTime {
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .font(.system(size: 12))
-                            Text(time)
-                                .font(.caption)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.red.opacity(0.2))
-                        .cornerRadius(4)
-                        .foregroundColor(.red)
                     }
                 }
                 .opacity(isCompleting ? 0.5 : 1)
@@ -373,7 +372,18 @@ struct TaskRow: View {
 
 struct MainView_Previews: PreviewProvider {
     static var previews: some View {
-        MainView()
-            .previewDisplayName("Main View")
+        TabView {
+            DashboardView()
+                .tabItem {
+                    Image(systemName: "rectangle.stack")
+                    Text("Dashboard")
+                }
+            
+            MainView()
+                .tabItem {
+                    Image(systemName: "calendar.day.timeline.left")
+                    Text("Hoje")
+                }
+        }
     }
 } 
