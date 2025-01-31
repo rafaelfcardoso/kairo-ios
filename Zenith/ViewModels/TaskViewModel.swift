@@ -1,8 +1,9 @@
 import Foundation
 import AVFoundation
 
+@MainActor
 class TaskViewModel: ObservableObject {
-    @Published var tasks: [TodoTask] = []
+    @Published private(set) var tasks: [TodoTask] = []
     private let baseURL = "http://localhost:3001"
     private var audioPlayer: AVAudioPlayer?
     
@@ -20,6 +21,47 @@ class TaskViewModel: ObservableObject {
             audioPlayer?.prepareToPlay()
         } catch {
             print("Could not create audio player: \(error)")
+        }
+    }
+    
+    func loadTasks(isRefreshing: Bool = false) async throws {
+        print("Loading tasks...")
+        guard let url = URL(string: "\(baseURL)/tasks?status=pending&includeArchived=false") else {
+            print("Invalid URL")
+            throw URLError(.badURL)
+        }
+        
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("Invalid response type")
+                throw URLError(.badServerResponse)
+            }
+            
+            print("Response status code: \(httpResponse.statusCode)")
+            
+            if !(200...299).contains(httpResponse.statusCode) {
+                if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    print("Server error: \(errorJson)")
+                }
+                throw URLError(.badServerResponse)
+            }
+            
+            // Print the raw JSON response for debugging
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("Raw JSON response for tasks: \(jsonString)")
+            }
+            
+            let decodedTasks: [TodoTask] = try JSONDecoder().decode([TodoTask].self, from: data)
+            print("Successfully decoded \(decodedTasks.count) tasks")
+            self.tasks = decodedTasks
+        } catch {
+            print("Error loading tasks: \(error)")
+            throw error
         }
     }
     
@@ -53,50 +95,13 @@ class TaskViewModel: ObservableObject {
             }
             
             let taskId = task.id
-            await MainActor.run {
-                // Play completion sound
-                audioPlayer?.play()
-                
-                // Remove the task from the list
-                tasks.removeAll { $0.id == taskId }
-            }
+            // Play completion sound
+            audioPlayer?.play()
+            
+            // Remove the task from the list
+            tasks.removeAll { $0.id == taskId }
         } catch {
             print("Task completion error: \(error)")
-            throw error
-        }
-    }
-    
-    // Combined function for fetching and refreshing tasks
-    func loadTasks(isRefreshing: Bool = false) async throws {
-        guard let url = URL(string: "\(baseURL)/tasks?status=pending&includeArchived=false") else {
-            throw URLError(.badURL)
-        }
-        
-        var request = URLRequest(url: url)
-        request.setValue("application/json", forHTTPHeaderField: "accept")
-        
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse,
-                (200...299).contains(httpResponse.statusCode) else {
-                throw URLError(.badServerResponse)
-            }
-            
-            let decodedTasks = try JSONDecoder().decode([TodoTask].self, from: data)
-            
-            // Sort tasks by priority
-            let sortedTasks = decodedTasks.sorted { task1, task2 in
-                let priorityOrder: [String: Int] = ["high": 0, "medium": 1, "low": 2]
-                let priority1 = priorityOrder[task1.priority.lowercased()] ?? 3
-                let priority2 = priorityOrder[task2.priority.lowercased()] ?? 3
-                return priority1 < priority2
-            }
-            
-            await MainActor.run {
-                self.tasks = sortedTasks
-            }
-        } catch {
             throw error
         }
     }
@@ -111,7 +116,6 @@ class TaskViewModel: ObservableObject {
     }
     
     // Call this for refresh
-    @MainActor
     func refreshTasks() async {
         do {
             try await loadTasks(isRefreshing: true)

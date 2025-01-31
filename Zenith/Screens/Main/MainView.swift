@@ -381,7 +381,7 @@ struct MainView_Previews: PreviewProvider {
             
             MainView()
                 .tabItem {
-                    Image(systemName: "calendar.day.timeline.left")
+                    Image(systemName: "filemenu.and.selection")
                     Text("Hoje")
                 }
         }
