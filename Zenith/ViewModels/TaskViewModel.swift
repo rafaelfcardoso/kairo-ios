@@ -24,44 +24,67 @@ class TaskViewModel: ObservableObject {
         }
     }
     
-    func loadTasks(isRefreshing: Bool = false) async throws {
-        print("Loading tasks...")
-        guard let url = URL(string: "\(baseURL)/tasks?status=pending&includeArchived=false") else {
-            print("Invalid URL")
+    func loadTasks(projectId: String? = nil, isRefreshing: Bool = false, forToday: Bool = false) async throws {
+        var urlComponents = URLComponents(string: "\(baseURL)/tasks")!
+        var queryItems = [
+            URLQueryItem(name: "includeArchived", value: "false"),
+            URLQueryItem(name: "status", value: "pending")
+        ]
+        
+        if let projectId = projectId {
+            queryItems.append(URLQueryItem(name: "projectId", value: projectId))
+        }
+        
+        urlComponents.queryItems = queryItems
+        
+        guard let url = urlComponents.url else {
+            print("Invalid URL: \(urlComponents)")
             throw URLError(.badURL)
         }
+        
+        print("Loading tasks with URL: \(url)")
         
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "accept")
         
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                print("Invalid response type")
-                throw URLError(.badServerResponse)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            print("HTTP Error: \(httpResponse.statusCode)")
+            if let errorString = String(data: data, encoding: .utf8) {
+                print("Error response: \(errorString)")
             }
+            throw URLError(.badServerResponse)
+        }
+        
+        print("Raw JSON response: \(String(data: data, encoding: .utf8) ?? "")")
+        
+        let decodedTasks = try JSONDecoder().decode([TodoTask].self, from: data)
+        
+        if forToday {
+            // Filter tasks for today after receiving them
+            let calendar = Calendar.current
+            let today = calendar.startOfDay(for: Date())
+            print("Filtering tasks for today: \(today)")
             
-            print("Response status code: \(httpResponse.statusCode)")
-            
-            if !(200...299).contains(httpResponse.statusCode) {
-                if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    print("Server error: \(errorJson)")
+            tasks = decodedTasks.filter { task in
+                guard let dueDateString = task.dueDate,
+                      let dueDate = ISO8601DateFormatter().date(from: dueDateString) else {
+                    print("Task \(task.title) has no due date or invalid date format")
+                    return false
                 }
-                throw URLError(.badServerResponse)
+                let taskDay = calendar.startOfDay(for: dueDate)
+                let isToday = calendar.isDate(taskDay, inSameDayAs: today)
+                print("Task '\(task.title)' due date: \(dueDate), isToday: \(isToday)")
+                return isToday
             }
-            
-            // Print the raw JSON response for debugging
-            if let jsonString = String(data: data, encoding: .utf8) {
-                print("Raw JSON response for tasks: \(jsonString)")
-            }
-            
-            let decodedTasks: [TodoTask] = try JSONDecoder().decode([TodoTask].self, from: data)
-            print("Successfully decoded \(decodedTasks.count) tasks")
-            self.tasks = decodedTasks
-        } catch {
-            print("Error loading tasks: \(error)")
-            throw error
+            print("Found \(tasks.count) tasks for today out of \(decodedTasks.count) total tasks")
+        } else {
+            tasks = decodedTasks
         }
     }
     
@@ -116,9 +139,9 @@ class TaskViewModel: ObservableObject {
     }
     
     // Call this for refresh
-    func refreshTasks() async {
+    func refreshTasks(projectId: String? = nil, forToday: Bool = false) async {
         do {
-            try await loadTasks(isRefreshing: true)
+            try await loadTasks(projectId: projectId, isRefreshing: true, forToday: forToday)
         } catch {
             print("Error refreshing tasks: \(error)")
         }

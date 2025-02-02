@@ -14,7 +14,6 @@ struct ErrorView: View {
     let secondaryTextColor: Color
     let textColor: Color
     let retryAction: () -> Void
-    @State private var shouldRetry = false
     
     var body: some View {
         VStack(spacing: 16) {
@@ -31,10 +30,7 @@ struct ErrorView: View {
                 .foregroundColor(secondaryTextColor)
                 .multilineTextAlignment(.center)
             
-            Button(action: {
-                shouldRetry = true
-                retryAction()
-            }) {
+            Button(action: retryAction) {
                 Text("Tentar novamente")
                     .foregroundColor(.blue)
             }
@@ -136,17 +132,19 @@ struct MainView: View {
                         secondaryTextColor: secondaryTextColor,
                         textColor: textColor,
                         retryAction: {
-                            isLoading = true
-                            hasError = false
+                            Task {
+                                isLoading = true
+                                hasError = false
+                                do {
+                                    try await viewModel.loadTasks(forToday: true)
+                                    isLoading = false
+                                } catch {
+                                    isLoading = false
+                                    hasError = true
+                                }
+                            }
                         }
                     )
-                    .task {
-                        do {
-                            try await viewModel.loadTasks()
-                        } catch {
-                            hasError = true
-                        }
-                    }
                 } else {
                     VStack(spacing: 16) {
                         // Header section
@@ -164,7 +162,7 @@ struct MainView: View {
                             secondaryTextColor: secondaryTextColor,
                             cardBackgroundColor: cardBackgroundColor,
                             onTaskCreated: {
-                                await viewModel.refreshTasks()
+                                await viewModel.refreshTasks(forToday: true)
                             },
                             viewModel: viewModel
                         )
@@ -198,7 +196,7 @@ struct MainView: View {
             .task {
                 do {
                     isLoading = true
-                    try await viewModel.loadTasks()
+                    try await viewModel.loadTasks(forToday: true)
                     isLoading = false
                 } catch {
                     isLoading = false
@@ -208,7 +206,7 @@ struct MainView: View {
             .refreshable {
                 do {
                     hasError = false
-                    try await viewModel.loadTasks(isRefreshing: true)
+                    try await viewModel.loadTasks(forToday: true)
                 } catch {
                     hasError = true
                 }
@@ -225,6 +223,7 @@ struct TaskRow: View {
     let viewModel: TaskViewModel
     @Environment(\.colorScheme) var colorScheme
     @State private var isCompleting = false
+    @State private var showingEditTask = false
     
     var cardBackgroundColor: Color {
         colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.95)
@@ -332,7 +331,7 @@ struct TaskRow: View {
                 HStack(spacing: 8) {
                     if let time = formattedTime {
                         HStack(spacing: 4) {
-                            Image(systemName: "calendar")
+                            Image(systemName: "clock")
                                 .font(.system(size: 12))
                             Text(time)
                                 .font(.caption)
@@ -367,6 +366,13 @@ struct TaskRow: View {
         .padding()
         .background(cardBackgroundColor)
         .cornerRadius(12)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showingEditTask = true
+        }
+        .sheet(isPresented: $showingEditTask) {
+            EditTaskView(task: task, viewModel: viewModel)
+        }
     }
 }
 

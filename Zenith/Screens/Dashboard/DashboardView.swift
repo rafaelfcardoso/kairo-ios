@@ -36,6 +36,7 @@ struct DashboardView: View {
     @State private var showingCreateProject = false
     @State private var isLoading = true
     @State private var hasError = false
+    @State private var expandedProjects = true
     
     var backgroundColor: Color {
         colorScheme == .dark ? .black : .white
@@ -60,82 +61,91 @@ struct DashboardView: View {
                 
                 if isLoading {
                     ProgressView()
-                } else if hasError {
-                    DashboardErrorView(
-                        secondaryTextColor: secondaryTextColor,
-                        textColor: textColor,
-                        retryAction: {
-                            Task {
-                                await loadProjects()
-                            }
-                        }
-                    )
                 } else {
                     ScrollView {
-                        VStack(spacing: 24) {
-                            // Projects Section Header
-                            HStack {
-                                Text("Projetos")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(textColor)
-                                
-                                Spacer()
-                                
-                                Button(action: {
-                                    showingCreateProject = true
-                                }) {
-                                    Image(systemName: "plus")
-                                        .foregroundColor(textColor)
+                        VStack(spacing: 16) {
+                            // Inbox Card
+                            NavigationLink(destination: InboxView()) {
+                                HStack {
+                                    Image(systemName: "tray")
                                         .font(.system(size: 20))
-                                }
-                            }
-                            .padding(.horizontal)
-                            .sheet(isPresented: $showingCreateProject) {
-                                CreateProjectView(viewModel: viewModel)
-                            }
-                            
-                            if viewModel.projects.isEmpty {
-                                Text("Nenhum projeto encontrado")
-                                    .foregroundColor(secondaryTextColor)
-                                    .padding()
-                            } else {
-                                // Projects List Block
-                                VStack(spacing: 0) {
-                                    ForEach(viewModel.projects) { project in
-                                        if viewModel.projects.firstIndex(where: { $0.id == project.id }) != 0 {
-                                            Divider()
-                                                .padding(.leading, 56)
-                                                .padding(.trailing, 16)
-                                        }
+                                        .foregroundColor(secondaryTextColor)
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Entrada")
+                                            .font(.headline)
+                                            .foregroundColor(textColor)
                                         
-                                        projectRow(project: project)
-                                            .padding(.vertical, 8)
-                                            .if(viewModel.projects.first?.id == project.id) { view in
-                                                view.padding(.top, 4)
-                                            }
-                                            .if(viewModel.projects.last?.id == project.id) { view in
-                                                view.padding(.bottom, 4)
-                                            }
+                                        Text("Tarefas não organizadas")
+                                            .font(.subheadline)
+                                            .foregroundColor(secondaryTextColor)
                                     }
+                                    
+                                    Spacer()
+                                    
+                                    Text("15")
+                                        .foregroundColor(secondaryTextColor)
+                                        .font(.system(.subheadline, design: .rounded))
                                 }
+                                .padding()
                                 .background(cardBackgroundColor)
                                 .cornerRadius(12)
+                            }
+                            
+                            // Projects Section
+                            VStack(spacing: 8) {
+                                // Header
+                                HStack {
+                                    Text("Projetos")
+                                        .font(.headline)
+                                        .foregroundColor(textColor)
+                                    
+                                    Spacer()
+                                    
+                                    Button(action: {
+                                        expandedProjects.toggle()
+                                    }) {
+                                        Image(systemName: expandedProjects ? "chevron.down" : "chevron.right")
+                                            .foregroundColor(secondaryTextColor)
+                                    }
+                                    
+                                    Button(action: {
+                                        showingCreateProject = true
+                                    }) {
+                                        Image(systemName: "plus")
+                                            .foregroundColor(textColor)
+                                    }
+                                }
                                 .padding(.horizontal)
+                                
+                                if expandedProjects {
+                                    if hasError {
+                                        DashboardErrorView(
+                                            secondaryTextColor: secondaryTextColor,
+                                            textColor: textColor,
+                                            retryAction: {
+                                                Task {
+                                                    await loadProjects()
+                                                }
+                                            }
+                                        )
+                                    } else {
+                                        // Projects List (excluding Inbox)
+                                        ForEach(viewModel.projects.filter { !$0.isSystem }) { project in
+                                            projectRow(project: project)
+                                        }
+                                    }
+                                }
                             }
                         }
-                    }
-                    .refreshable {
-                        await loadProjects()
+                        .padding()
                     }
                 }
             }
             .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.inline)
             .task {
-                if isLoading {
-                    await loadProjects()
-                }
+                await loadProjects()
             }
         }
     }
@@ -156,7 +166,7 @@ struct DashboardView: View {
     
     @ViewBuilder
     private func projectRow(project: Project) -> some View {
-        NavigationLink(destination: EmptyView()) {
+        NavigationLink(destination: ProjectTasksView(project: project)) {
             HStack(spacing: 16) {
                 Image(systemName: "folder.fill")
                     .foregroundColor(Color(hex: project.color))
@@ -167,11 +177,19 @@ struct DashboardView: View {
                 
                 Spacer()
                 
+                if let taskCount = project.taskCount {
+                    Text("\(taskCount)")
+                        .foregroundColor(secondaryTextColor)
+                        .font(.system(.subheadline, design: .rounded))
+                }
+                
                 Image(systemName: "chevron.right")
                     .foregroundColor(secondaryTextColor)
                     .font(.system(size: 14))
             }
-            .padding(.horizontal)
+            .padding()
+            .background(cardBackgroundColor)
+            .cornerRadius(12)
         }
     }
 }
