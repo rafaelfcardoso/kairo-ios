@@ -259,17 +259,22 @@ struct CreateTaskView: View {
         defer { isLoading = false }
         
         let dateFormatter = ISO8601DateFormatter()
-        let dueDate = dateFormatter.string(from: Date().addingTimeInterval(24 * 60 * 60))
+        dateFormatter.formatOptions = [.withInternetDateTime]
+        
+        // Use selected date or default to tomorrow at end of day
+        let dueDate = selectedDate ?? Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        let dueDateString = dateFormatter.string(from: dueDate)
         
         let task = [
             "title": taskName,
             "description": taskDescription,
             "priority": selectedPriority?.rawValue ?? "none",
-            "dueDate": dueDate
+            "dueDate": dueDateString
         ]
         
         guard let url = URL(string: "http://localhost:3001/tasks"),
-              let jsonData = try? JSONSerialization.data(withJSONObject: task) else {
+            let jsonData = try? JSONSerialization.data(withJSONObject: task) else {
+            print("Error creating JSON data")
             return
         }
         
@@ -280,16 +285,26 @@ struct CreateTaskView: View {
         request.httpBody = jsonData
         
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
-            if let httpResponse = response as? HTTPURLResponse,
-               (200...299).contains(httpResponse.statusCode) {
-                await onTaskCreated()
-                await MainActor.run {
-                    dismiss()
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("Invalid response")
+                return
+            }
+            
+            if !(200...299).contains(httpResponse.statusCode) {
+                if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    print("Server error: \(errorJson)")
                 }
+                return
+            }
+            
+            await onTaskCreated()
+            await MainActor.run {
+                dismiss()
             }
         } catch {
-            print("Error creating task: \(error)")
+            print("Network error: \(error)")
         }
     }
     

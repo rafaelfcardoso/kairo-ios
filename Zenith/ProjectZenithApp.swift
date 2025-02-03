@@ -9,9 +9,30 @@ import SwiftUI
 
 @main
 struct ProjectZenithApp: App {
+    @Environment(\.colorScheme) var colorScheme
+    
+    var backgroundColor: Color {
+        colorScheme == .dark ? .black : .white
+    }
+    
     var body: some Scene {
         WindowGroup {
-            MainView()
+            TabView {
+                DashboardView()
+                    .tabItem {
+                        Image(systemName: "chart.bar")
+                        Text("Dashboard")
+                    }
+                    .tag(0)
+                
+                MainView()
+                    .tabItem {
+                        Image(systemName: "calendar")
+                        Text("Hoje")
+                    }
+                    .tag(1)
+            }
+            .background(backgroundColor)
         }
     }
 }
