@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 class ProjectViewModel: ObservableObject {
     @Published private(set) var projects: [Project] = []
-    private let baseURL = "http://localhost:3001"
+    private let baseURL = "https://zenith-api-nest-development.up.railway.app"
     
     func createProject(name: String, color: String) async throws {
         guard let url = URL(string: "\(baseURL)/projects") else {
@@ -52,7 +52,13 @@ class ProjectViewModel: ObservableObject {
     
     func loadProjects() async throws {
         print("Loading projects...")
-        guard let url = URL(string: "\(baseURL)/projects") else {
+        var urlComponents = URLComponents(string: "\(baseURL)/projects")!
+        urlComponents.queryItems = [
+            URLQueryItem(name: "includeSystem", value: "true"),
+            URLQueryItem(name: "includeArchived", value: "false")
+        ]
+        
+        guard let url = urlComponents.url else {
             print("Invalid URL")
             throw URLError(.badURL)
         }
