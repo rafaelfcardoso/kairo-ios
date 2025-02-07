@@ -70,18 +70,24 @@ struct TaskListView: View {
                     .background(cardBackgroundColor)
                     .cornerRadius(12)
                 }
+                .accessibilityIdentifier("add-task-button")
                 .sheet(isPresented: $showingCreateTask) {
-                    CreateTaskView(onTaskCreated: {
-                        await MainActor.run {
-                            shouldRefresh = true
+                    TaskFormView(
+                        viewModel: viewModel,
+                        onTaskSaved: {
+                            await MainActor.run {
+                                shouldRefresh = true
+                            }
+                            await onTaskCreated()
+                            await MainActor.run {
+                                shouldRefresh = false
+                            }
                         }
-                        await onTaskCreated()
-                        await MainActor.run {
-                            shouldRefresh = false
-                        }
-                    })
-                    .presentationDetents([.height(250)])
+                    )
+                    .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
+                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                    .interactiveDismissDisabled(false)
                 }
             }
             .padding(.horizontal)
@@ -105,7 +111,7 @@ struct MainView: View {
     @Environment(\.colorScheme) var colorScheme
     
     var backgroundColor: Color {
-        colorScheme == .dark ? .black : .white
+        colorScheme == .dark ? .black : Color(hex: "F1F2F4")
     }
     
     var textColor: Color {
@@ -113,11 +119,19 @@ struct MainView: View {
     }
     
     var secondaryTextColor: Color {
-        colorScheme == .dark ? .gray : .secondary
+        colorScheme == .dark ? .gray : Color(hex: "7E7E7E")
     }
     
     var cardBackgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.95)
+        colorScheme == .dark ? Color(white: 0.1) : .white
+    }
+    
+    var highlightColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+    
+    var inactiveColor: Color {
+        colorScheme == .dark ? .gray : Color(hex: "7E7E7E")
     }
     
     var body: some View {
@@ -149,7 +163,7 @@ struct MainView: View {
                     VStack(spacing: 16) {
                         // Header section
                         VStack(alignment: .leading) {
-                            Text("Domingo - 5 Jan")
+                            Text("Quinta - 6 Fev")
                                 .font(.subheadline)
                                 .foregroundColor(secondaryTextColor)
                         }
@@ -371,7 +385,17 @@ struct TaskRow: View {
             showingEditTask = true
         }
         .sheet(isPresented: $showingEditTask) {
-            EditTaskView(task: task, viewModel: viewModel)
+            TaskFormView(
+                task: task,
+                viewModel: viewModel,
+                onTaskSaved: {
+                    await viewModel.refreshTasks(forToday: true)
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+            .interactiveDismissDisabled(false)
         }
     }
 }

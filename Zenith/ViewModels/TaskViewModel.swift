@@ -4,7 +4,7 @@ import AVFoundation
 @MainActor
 class TaskViewModel: ObservableObject {
     @Published private(set) var tasks: [TodoTask] = []
-    private let baseURL = "http://localhost:3001"
+    private let baseURL = "https://zenith-api-nest-development.up.railway.app"
     private var audioPlayer: AVAudioPlayer?
     
     init() {
