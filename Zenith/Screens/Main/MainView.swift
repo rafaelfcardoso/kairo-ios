@@ -240,7 +240,7 @@ struct TaskRow: View {
     @State private var showingEditTask = false
     
     var cardBackgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.95)
+        colorScheme == .dark ? Color(white: 0.1) : .white
     }
     
     var textColor: Color {
@@ -265,35 +265,23 @@ struct TaskRow: View {
     }
     
     private var formattedTime: String? {
-        guard let dueDateString = task.dueDate else {
-            print("Debug: No due date string available")
+        // Only show time if it was explicitly set
+        guard task.hasTime,
+              let dueDateString = task.dueDate else {
             return nil
         }
         
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         
-        guard let dueDate = formatter.date(from: dueDateString) else {
-            print("Debug: Could not parse date from string: \(dueDateString)")
-            return nil
-        }
-        
-        // Check if the time component is not midnight (00:00)
-        let calendar = Calendar.current
-        let hour = calendar.component(.hour, from: dueDate)
-        let minute = calendar.component(.minute, from: dueDate)
-        
-        if hour == 0 && minute == 0 {
-            print("Debug: Time is midnight (00:00), not showing time")
+        guard let date = formatter.date(from: dueDateString) else {
             return nil
         }
         
         let timeFormatter = DateFormatter()
         timeFormatter.timeStyle = .short
         timeFormatter.dateStyle = .none
-        let formattedResult = timeFormatter.string(from: dueDate)
-        print("Debug: Formatted time: \(formattedResult)")
-        return formattedResult
+        return timeFormatter.string(from: date)
     }
     
     var body: some View {

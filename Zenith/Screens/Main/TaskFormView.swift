@@ -31,8 +31,9 @@ struct DateSelectionView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
     @Binding var selectedDate: Date?
+    @Binding var selectedTime: Date?
     @State private var showingTimePicker = false
-    @State private var selectedTime: Date? = nil
+    @State private var tempTime: Date? = nil
     
     var textColor: Color {
         colorScheme == .dark ? .white : .black
@@ -54,10 +55,20 @@ struct DateSelectionView: View {
         guard let time = selectedTime else { return date }
         let calendar = Calendar.current
         let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
+        print("Debug: Applying time components - Hour: \(timeComponents.hour ?? 0), Minute: \(timeComponents.minute ?? 0)")
         return calendar.date(bySettingHour: timeComponents.hour ?? 0,
                            minute: timeComponents.minute ?? 0,
                            second: 0,
                            of: date) ?? date
+    }
+    
+    private func handleDismiss() {
+        if let date = selectedDate {
+            // Always apply the time if it's set, even for initial task creation
+            selectedDate = applyTimeToDate(date)
+            print("Debug: Final selected date with time: \(selectedDate?.description ?? "nil")")
+        }
+        dismiss()
     }
     
     var body: some View {
@@ -75,6 +86,7 @@ struct DateSelectionView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         selectedDate = nil
+                        selectedTime = nil
                     }
                     
                     HStack {
@@ -89,6 +101,7 @@ struct DateSelectionView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: Date())
+                        selectedTime = nil
                     }
                 }
                 
@@ -98,7 +111,10 @@ struct DateSelectionView: View {
                         selection: Binding(
                             get: { selectedDate ?? Date() },
                             set: { newDate in
-                                selectedDate = applyTimeToDate(newDate)
+                                selectedDate = newDate
+                                if selectedTime == nil {
+                                    selectedTime = nil
+                                }
                             }
                         ),
                         displayedComponents: .date
@@ -119,14 +135,7 @@ struct DateSelectionView: View {
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        if selectedTime == nil {
-                            selectedTime = Calendar.current.date(
-                                bySettingHour: 23,
-                                minute: 59,
-                                second: 59,
-                                of: Date()
-                            )
-                        }
+                        tempTime = selectedTime ?? Date()
                         showingTimePicker = true
                     }
                 }
@@ -141,18 +150,19 @@ struct DateSelectionView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Concluir") {
-                        if let date = selectedDate {
-                            selectedDate = applyTimeToDate(date)
-                        }
-                        dismiss()
+                        handleDismiss()
                     }
                     .bold()
                 }
             }
             .sheet(isPresented: $showingTimePicker) {
                 TimeSelectionView(selectedTime: Binding(
-                    get: { selectedTime ?? Date() },
-                    set: { selectedTime = $0 }
+                    get: { tempTime ?? Date() },
+                    set: { 
+                        tempTime = $0
+                        selectedTime = $0
+                        print("Debug: Time selected: \($0.description)")
+                    }
                 ))
             }
         }
@@ -168,6 +178,7 @@ struct TaskFormView: View {
     @State private var taskDescription: String
     @State private var selectedPriority: Priority?
     @State private var selectedDate: Date?
+    @State private var selectedTime: Date?
     @State private var selectedProject: Project?
     @State private var isLoading = false
     @State private var isLoadingProjects = true
@@ -199,9 +210,13 @@ struct TaskFormView: View {
         if let dueDateString = task?.dueDate {
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            _selectedDate = State(initialValue: formatter.date(from: dueDateString))
+            let date = formatter.date(from: dueDateString)
+            _selectedDate = State(initialValue: date)
+            // If task has time set, use the same date for selectedTime
+            _selectedTime = State(initialValue: task?.hasTime == true ? date : nil)
         } else {
             _selectedDate = State(initialValue: nil)
+            _selectedTime = State(initialValue: nil)
         }
         
         _selectedProject = State(initialValue: task?.project)
@@ -296,14 +311,42 @@ struct TaskFormView: View {
         let dateFormatter = ISO8601DateFormatter()
         dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         
-        let dueDate = selectedDate ?? Date()
-        let dueDateString = dateFormatter.string(from: dueDate)
+        var calendar = Calendar.current
+        calendar.timeZone = TimeZone.current
         
-        let taskData = [
+        let dueDate: Date
+        
+        if let selectedDate = selectedDate {
+            if let selectedTime = selectedTime {
+                // Combine the selected date with the selected time
+                let timeComponents = calendar.dateComponents([.hour, .minute], from: selectedTime)
+                dueDate = calendar.date(
+                    bySettingHour: timeComponents.hour ?? 0,
+                    minute: timeComponents.minute ?? 0,
+                    second: 0,
+                    of: selectedDate
+                ) ?? selectedDate
+                print("Debug: Combined date and time - Hour: \(timeComponents.hour ?? 0), Minute: \(timeComponents.minute ?? 0)")
+            } else {
+                // No time selected, use start of day
+                dueDate = calendar.startOfDay(for: selectedDate)
+                print("Debug: Using start of day")
+            }
+        } else {
+            // No date selected, use start of today
+            dueDate = calendar.startOfDay(for: Date())
+            print("Debug: Using start of today")
+        }
+        
+        let dueDateString = dateFormatter.string(from: dueDate)
+        print("Debug: Final due date string: \(dueDateString)")
+        
+        let taskData: [String: Any] = [
             "title": taskTitle,
             "description": taskDescription,
             "priority": selectedPriority?.rawValue ?? "none",
             "dueDate": dueDateString,
+            "hasTime": selectedTime != nil,
             "projectId": selectedProject?.id ?? inboxProjectId
         ]
         
@@ -378,9 +421,6 @@ struct TaskFormView: View {
                     .padding()
                     .background(backgroundColor)
                     
-                    Divider()
-                        .background(secondaryTextColor)
-                    
                     // Description
                     if !taskDescription.isEmpty || existingTask == nil {
                         HStack(spacing: 16) {
@@ -403,9 +443,6 @@ struct TaskFormView: View {
                         }
                         .padding()
                         .background(backgroundColor)
-                        
-                        Divider()
-                            .background(secondaryTextColor)
                     }
                     
                     // Parameter Buttons
@@ -454,10 +491,11 @@ struct TaskFormView: View {
                                     .accessibilityIdentifier("project-option-\(project.id)")
                                 }
                             } label: {
+                                let isInbox = selectedProject?.isSystem ?? true // Default to true for inbox
                                 parameterButton(
-                                    icon: selectedProject?.isSystem == true ? "tray" : "folder.fill",
-                                    title: selectedProject?.isSystem == true ? "Caixa de Entrada" : (selectedProject?.name ?? "Caixa de Entrada"),
-                                    color: selectedProject?.isSystem == true ? nil : (selectedProject.map { Color(hex: $0.color) })
+                                    icon: isInbox ? "tray" : "folder",
+                                    title: isInbox ? "Caixa de Entrada" : (selectedProject?.name ?? "Caixa de Entrada"),
+                                    color: isInbox ? nil : (selectedProject.map { Color(hex: $0.color) })
                                 )
                             }
                             .accessibilityIdentifier("project-selector")
@@ -474,7 +512,7 @@ struct TaskFormView: View {
                                 )
                             }
                             .sheet(isPresented: $showingDatePicker) {
-                                DateSelectionView(selectedDate: $selectedDate)
+                                DateSelectionView(selectedDate: $selectedDate, selectedTime: $selectedTime)
                             }
                             
                             // Priority
@@ -591,6 +629,7 @@ struct TaskFormView_Previews: PreviewProvider {
                 status: "pending",
                 priority: "high",
                 dueDate: nil,
+                hasTime: false,
                 estimatedMinutes: 0,
                 isArchived: false,
                 createdAt: "",

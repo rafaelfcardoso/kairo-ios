@@ -7,6 +7,7 @@ struct TodoTask: Identifiable, Codable {
     let status: String
     let priority: String
     let dueDate: String?
+    let hasTime: Bool
     let estimatedMinutes: Int
     let isArchived: Bool
     let createdAt: String

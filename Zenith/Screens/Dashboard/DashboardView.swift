@@ -153,6 +153,11 @@ struct DashboardView: View {
             .task {
                 await loadProjects()
             }
+            .sheet(isPresented: $showingCreateProject) {
+                CreateProjectView(viewModel: viewModel)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
     
