@@ -120,10 +120,12 @@ struct CreateProjectView: View {
         
         do {
             // Convert Color to hex string
-            let hexColor = String(format: "%02X%02X%02X",
-                                Int(selectedColor.cgColor?.components?[0] ?? 0 * 255),
-                                Int(selectedColor.cgColor?.components?[1] ?? 0 * 255),
-                                Int(selectedColor.cgColor?.components?[2] ?? 0 * 255))
+            let components = selectedColor.cgColor?.components ?? [0, 0, 0, 1]
+            let r = Int(components[0] * 255)
+            let g = Int(components[1] * 255)
+            let b = Int(components[2] * 255)
+            let hexColor = String(format: "#%02X%02X%02X", r, g, b)
+            print("Debug: Converting color to hex: \(hexColor)")
             
             try await viewModel.createProject(name: projectName, color: hexColor)
             dismiss()

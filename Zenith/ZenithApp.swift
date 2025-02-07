@@ -1,6 +1,6 @@
 //
-//  ProjectZenithApp.swift
-//  ProjectZenith
+//  ZenithApp.swift
+//  Zenith
 //
 //  Created by Rafael Cardoso on 18/12/24.
 //
@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct ProjectZenithApp: App {
+struct ZenithApp: App {
     @Environment(\.colorScheme) var colorScheme
     @State private var selectedTab: Tab = .today
     
@@ -46,17 +46,18 @@ struct ProjectZenithApp: App {
                     }
                     .tag(Tab.today)
             }
-            .accentColor(activeColor)
+            .tint(activeColor)
             .background(backgroundColor)
             .onAppear {
                 // Customize unselected tab item color
-                UITabBar.appearance().unselectedItemTintColor = UIColor(named: "7E7E7E")
+                let unselectedColor = UIColor(red: 126/255, green: 126/255, blue: 126/255, alpha: 1)
+                UITabBar.appearance().unselectedItemTintColor = unselectedColor
             }
         }
     }
 }
 
-struct ProjectZenithApp_Previews: PreviewProvider {
+struct ZenithApp_Previews: PreviewProvider {
     static var previews: some View {
         Group {
             TabView {
