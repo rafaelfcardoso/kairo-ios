@@ -39,7 +39,7 @@ struct DashboardView: View {
     @State private var expandedProjects = true
     
     var backgroundColor: Color {
-        colorScheme == .dark ? .black : .white
+        colorScheme == .dark ? .black : Color(hex: "F1F2F4")
     }
     
     var textColor: Color {
@@ -47,11 +47,19 @@ struct DashboardView: View {
     }
     
     var secondaryTextColor: Color {
-        colorScheme == .dark ? .gray : .secondary
+        Color(hex: "7E7E7E")
     }
     
     var cardBackgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.95)
+        colorScheme == .dark ? Color(white: 0.1) : .white
+    }
+    
+    var activeColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+    
+    var inactiveColor: Color {
+        Color(hex: "7E7E7E")
     }
     
     var body: some View {
@@ -65,31 +73,29 @@ struct DashboardView: View {
                     ScrollView {
                         VStack(spacing: 16) {
                             // Inbox Card
-                            NavigationLink(destination: InboxView()) {
-                                HStack {
-                                    Image(systemName: "tray")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(secondaryTextColor)
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
+                            if let inboxProject = viewModel.projects.first(where: { $0.isSystem }) {
+                                NavigationLink(destination: InboxView()) {
+                                    HStack {
+                                        Image(systemName: "tray")
+                                            .font(.system(size: 20))
+                                            .foregroundColor(inactiveColor)
+                                        
                                         Text("Entrada")
                                             .font(.headline)
-                                            .foregroundColor(textColor)
+                                            .foregroundColor(activeColor)
                                         
-                                        Text("Tarefas não organizadas")
-                                            .font(.subheadline)
-                                            .foregroundColor(secondaryTextColor)
+                                        Spacer()
+                                        
+                                        if let taskCount = inboxProject.taskCount {
+                                            Text("\(taskCount)")
+                                                .foregroundColor(inactiveColor)
+                                                .font(.system(.subheadline, design: .rounded))
+                                        }
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Text("15")
-                                        .foregroundColor(secondaryTextColor)
-                                        .font(.system(.subheadline, design: .rounded))
+                                    .padding()
+                                    .background(cardBackgroundColor)
+                                    .cornerRadius(12)
                                 }
-                                .padding()
-                                .background(cardBackgroundColor)
-                                .cornerRadius(12)
                             }
                             
                             // Projects Section
@@ -98,7 +104,7 @@ struct DashboardView: View {
                                 HStack {
                                     Text("Projetos")
                                         .font(.headline)
-                                        .foregroundColor(textColor)
+                                        .foregroundColor(activeColor)
                                     
                                     Spacer()
                                     
@@ -106,14 +112,14 @@ struct DashboardView: View {
                                         expandedProjects.toggle()
                                     }) {
                                         Image(systemName: expandedProjects ? "chevron.down" : "chevron.right")
-                                            .foregroundColor(secondaryTextColor)
+                                            .foregroundColor(inactiveColor)
                                     }
                                     
                                     Button(action: {
                                         showingCreateProject = true
                                     }) {
                                         Image(systemName: "plus")
-                                            .foregroundColor(textColor)
+                                            .foregroundColor(activeColor)
                                     }
                                 }
                                 .padding(.horizontal)
@@ -146,6 +152,11 @@ struct DashboardView: View {
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 await loadProjects()
+            }
+            .sheet(isPresented: $showingCreateProject) {
+                CreateProjectView(viewModel: viewModel)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
             }
         }
     }

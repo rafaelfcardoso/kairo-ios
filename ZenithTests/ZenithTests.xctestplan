@@ -1,0 +1,33 @@
+{
+  "configurations" : [
+    {
+      "id" : "B5A3B44D-9A68-47C9-A736-6D22F1A9C3B3",
+      "name" : "Test",
+      "options" : {
+        "targetForVariableExpansion" : {
+          "containerPath" : "container:Zenith.xcodeproj",
+          "identifier" : "53E5796D2B2F4EAA00C68C41",
+          "name" : "Zenith"
+        }
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Zenith.xcodeproj",
+      "identifier" : "53E5796D2B2F4EAA00C68C41",
+      "name" : "Zenith"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Zenith.xcodeproj",
+        "identifier" : "536362222D13028900672C90",
+        "name" : "ZenithTests"
+      }
+    }
+  ],
+  "version" : 1
+} 

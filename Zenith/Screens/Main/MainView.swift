@@ -70,18 +70,24 @@ struct TaskListView: View {
                     .background(cardBackgroundColor)
                     .cornerRadius(12)
                 }
+                .accessibilityIdentifier("add-task-button")
                 .sheet(isPresented: $showingCreateTask) {
-                    CreateTaskView(onTaskCreated: {
-                        await MainActor.run {
-                            shouldRefresh = true
+                    TaskFormView(
+                        viewModel: viewModel,
+                        onTaskSaved: {
+                            await MainActor.run {
+                                shouldRefresh = true
+                            }
+                            await onTaskCreated()
+                            await MainActor.run {
+                                shouldRefresh = false
+                            }
                         }
-                        await onTaskCreated()
-                        await MainActor.run {
-                            shouldRefresh = false
-                        }
-                    })
-                    .presentationDetents([.height(250)])
+                    )
+                    .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
+                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                    .interactiveDismissDisabled(false)
                 }
             }
             .padding(.horizontal)
@@ -105,7 +111,7 @@ struct MainView: View {
     @Environment(\.colorScheme) var colorScheme
     
     var backgroundColor: Color {
-        colorScheme == .dark ? .black : .white
+        colorScheme == .dark ? .black : Color(hex: "F1F2F4")
     }
     
     var textColor: Color {
@@ -113,11 +119,19 @@ struct MainView: View {
     }
     
     var secondaryTextColor: Color {
-        colorScheme == .dark ? .gray : .secondary
+        colorScheme == .dark ? .gray : Color(hex: "7E7E7E")
     }
     
     var cardBackgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.95)
+        colorScheme == .dark ? Color(white: 0.1) : .white
+    }
+    
+    var highlightColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+    
+    var inactiveColor: Color {
+        colorScheme == .dark ? .gray : Color(hex: "7E7E7E")
     }
     
     var body: some View {
@@ -149,7 +163,7 @@ struct MainView: View {
                     VStack(spacing: 16) {
                         // Header section
                         VStack(alignment: .leading) {
-                            Text("Domingo - 5 Jan")
+                            Text("Quinta - 6 Fev")
                                 .font(.subheadline)
                                 .foregroundColor(secondaryTextColor)
                         }
@@ -226,7 +240,7 @@ struct TaskRow: View {
     @State private var showingEditTask = false
     
     var cardBackgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.95)
+        colorScheme == .dark ? Color(white: 0.1) : .white
     }
     
     var textColor: Color {
@@ -251,35 +265,23 @@ struct TaskRow: View {
     }
     
     private var formattedTime: String? {
-        guard let dueDateString = task.dueDate else {
-            print("Debug: No due date string available")
+        // Only show time if it was explicitly set
+        guard task.hasTime,
+              let dueDateString = task.dueDate else {
             return nil
         }
         
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         
-        guard let dueDate = formatter.date(from: dueDateString) else {
-            print("Debug: Could not parse date from string: \(dueDateString)")
-            return nil
-        }
-        
-        // Check if the time component is not midnight (00:00)
-        let calendar = Calendar.current
-        let hour = calendar.component(.hour, from: dueDate)
-        let minute = calendar.component(.minute, from: dueDate)
-        
-        if hour == 0 && minute == 0 {
-            print("Debug: Time is midnight (00:00), not showing time")
+        guard let date = formatter.date(from: dueDateString) else {
             return nil
         }
         
         let timeFormatter = DateFormatter()
         timeFormatter.timeStyle = .short
         timeFormatter.dateStyle = .none
-        let formattedResult = timeFormatter.string(from: dueDate)
-        print("Debug: Formatted time: \(formattedResult)")
-        return formattedResult
+        return timeFormatter.string(from: date)
     }
     
     var body: some View {
@@ -371,7 +373,17 @@ struct TaskRow: View {
             showingEditTask = true
         }
         .sheet(isPresented: $showingEditTask) {
-            EditTaskView(task: task, viewModel: viewModel)
+            TaskFormView(
+                task: task,
+                viewModel: viewModel,
+                onTaskSaved: {
+                    await viewModel.refreshTasks(forToday: true)
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+            .interactiveDismissDisabled(false)
         }
     }
 }
