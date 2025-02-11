@@ -626,7 +626,7 @@ struct TaskFormView_Previews: PreviewProvider {
                 id: "1",
                 title: "Estudar Algoritmos",
                 description: nil,
-                status: "pending",
+                status: "not_started",
                 priority: "high",
                 dueDate: nil,
                 hasTime: false,

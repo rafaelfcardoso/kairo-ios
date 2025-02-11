@@ -35,7 +35,7 @@ class TaskViewModel: ObservableObject {
             var urlComponents = URLComponents(string: "\(baseURL)/tasks")!
             var queryItems = [
                 URLQueryItem(name: "includeArchived", value: "false"),
-                URLQueryItem(name: "status", value: "pending")
+                URLQueryItem(name: "status", value: "not_started")
             ]
             
             if let projectId = projectId {
