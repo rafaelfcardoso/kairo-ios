@@ -22,6 +22,6 @@ struct Project: Identifiable, Codable {
         case order
         case createdAt
         case updatedAt
-        case taskCount = "pendingTasksCount"
+        case taskCount = "notStartedTasksCount"
     }
 } 
