@@ -3,11 +3,51 @@ import Foundation
 @MainActor
 class ProjectViewModel: ObservableObject {
     @Published private(set) var projects: [Project] = []
-    private let baseURL = "https://zenith-api-nest-development.up.railway.app"
+    private let baseURL = APIConfig.baseURL
+    
+    private func executeRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+            
+            print("📂 [Projects] Response status: \(httpResponse.statusCode)")
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("📂 [Projects] Response body: \(responseString)")
+            }
+            
+            try APIConfig.handleAPIResponse(data, httpResponse)
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch let error as APIError {
+            print("📂 [Projects] API Error: \(error.localizedDescription)")
+            if case .unauthorized = error {
+                try await APIConfig.authenticateWithToken()
+                
+                var retryRequest = request
+                APIConfig.addAuthHeaders(to: &retryRequest)
+                
+                let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+                guard let httpResponse = retryResponse as? HTTPURLResponse else {
+                    throw APIError.invalidResponse
+                }
+                
+                print("📂 [Projects] Retry response status: \(httpResponse.statusCode)")
+                if let responseString = String(data: retryData, encoding: .utf8) {
+                    print("📂 [Projects] Retry response body: \(responseString)")
+                }
+                
+                try APIConfig.handleAPIResponse(retryData, httpResponse)
+                return try JSONDecoder().decode(T.self, from: retryData)
+            }
+            throw error
+        }
+    }
     
     func createProject(name: String, color: String) async throws {
-        guard let url = URL(string: "\(baseURL)/projects") else {
-            throw URLError(.badURL)
+        let endpointURL = try APIConfig.getEndpointURL("/projects")
+        guard let url = URL(string: endpointURL) else {
+            throw APIError.invalidURL(endpointURL)
         }
         
         let projectData = [
@@ -23,77 +63,39 @@ class ProjectViewModel: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "accept")
+        APIConfig.addAuthHeaders(to: &request)
         request.httpBody = jsonData
         
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                print("Invalid response type")
-                throw URLError(.badServerResponse)
-            }
-            
-            print("Create project response status code: \(httpResponse.statusCode)")
-            
-            if !(200...299).contains(httpResponse.statusCode) {
-                if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    print("Server error: \(errorJson)")
-                }
-                throw URLError(.badServerResponse)
-            }
-            
-            // Refresh projects list after successful creation
-            try await loadProjects()
-        } catch {
-            print("Error creating project: \(error)")
-            throw error
-        }
+        // Use the generic request executor
+        let _: EmptyResponse = try await executeRequest(request)
+        
+        // Refresh projects list after successful creation
+        try await loadProjects()
     }
     
     func loadProjects() async throws {
-        print("Loading projects...")
-        var urlComponents = URLComponents(string: "\(baseURL)/projects")!
+        print("📂 [Projects] Loading projects...")
+        let endpointURL = try APIConfig.getEndpointURL("/projects")
+        var urlComponents = URLComponents(string: endpointURL)!
+        
+        // Add includeSystem query parameter
         urlComponents.queryItems = [
-            URLQueryItem(name: "includeSystem", value: "true"),
-            URLQueryItem(name: "includeArchived", value: "false")
+            URLQueryItem(name: "includeSystem", value: "true")
         ]
         
         guard let url = urlComponents.url else {
-            print("Invalid URL")
-            throw URLError(.badURL)
+            throw APIError.invalidURL(urlComponents.description)
         }
         
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "accept")
+        APIConfig.addAuthHeaders(to: &request)
         
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                print("Invalid response type")
-                throw URLError(.badServerResponse)
-            }
-            
-            print("Response status code: \(httpResponse.statusCode)")
-            
-            if !(200...299).contains(httpResponse.statusCode) {
-                if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    print("Server error: \(errorJson)")
-                }
-                throw URLError(.badServerResponse)
-            }
-            
-            // Print the raw JSON response for debugging
-            if let jsonString = String(data: data, encoding: .utf8) {
-                print("Raw JSON response: \(jsonString)")
-            }
-            
-            let decodedProjects: [Project] = try JSONDecoder().decode([Project].self, from: data)
-            print("Successfully decoded \(decodedProjects.count) projects")
-            self.projects = decodedProjects
-        } catch {
-            print("Error loading projects: \(error)")
-            throw error
-        }
+        let decodedProjects: [Project] = try await executeRequest(request)
+        print("📂 [Projects] Loaded \(decodedProjects.count) projects")
+        print("📂 [Projects] System projects: \(decodedProjects.filter { $0.isSystem }.count)")
+        projects = decodedProjects
     }
+    
+    private struct EmptyResponse: Decodable {}
 } 
