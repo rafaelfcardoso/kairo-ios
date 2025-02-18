@@ -194,6 +194,8 @@ struct TaskFormView: View {
         self.onTaskSaved = onTaskSaved
         _viewModel = StateObject(wrappedValue: viewModel)
         
+        print("🕒 [Timezone] Current timezone: \(TimeZone.current.identifier) (GMT\(TimeZone.current.secondsFromGMT()/3600 >= 0 ? "+" : "")\(TimeZone.current.secondsFromGMT()/3600))")
+        
         // Initialize state with existing task data or defaults
         _taskTitle = State(initialValue: task?.title ?? "")
         _taskDescription = State(initialValue: task?.description ?? "")
@@ -208,12 +210,33 @@ struct TaskFormView: View {
         _selectedPriority = State(initialValue: priority)
         
         if let dueDateString = task?.dueDate {
+            print("🕒 [Timezone] Received dueDate from API: \(dueDateString)")
+            
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            let date = formatter.date(from: dueDateString)
-            _selectedDate = State(initialValue: date)
-            // If task has time set, use the same date for selectedTime
-            _selectedTime = State(initialValue: task?.hasTime == true ? date : nil)
+            if let utcDate = formatter.date(from: dueDateString) {
+                print("🕒 [Timezone] Parsed UTC date: \(utcDate)")
+                
+                // Convert UTC to local time
+                let localDate = utcDate.addingTimeInterval(Double(TimeZone.current.secondsFromGMT()))
+                print("🕒 [Timezone] Converted to local date: \(localDate)")
+                print("🕒 [Timezone] Time difference applied: \(TimeZone.current.secondsFromGMT()/3600) hours")
+                
+                _selectedDate = State(initialValue: localDate)
+                // If task has time set, use the same local date for selectedTime
+                _selectedTime = State(initialValue: task?.hasTime == true ? localDate : nil)
+                
+                if task?.hasTime == true {
+                    let timeFormatter = DateFormatter()
+                    timeFormatter.timeStyle = .short
+                    timeFormatter.dateStyle = .none
+                    print("🕒 [Timezone] Task has time set. Local time: \(timeFormatter.string(from: localDate))")
+                }
+            } else {
+                print("🕒 [Timezone] Failed to parse date: \(dueDateString)")
+                _selectedDate = State(initialValue: nil)
+                _selectedTime = State(initialValue: nil)
+            }
         } else {
             _selectedDate = State(initialValue: nil)
             _selectedTime = State(initialValue: nil)
@@ -308,89 +331,208 @@ struct TaskFormView: View {
         isLoading = true
         defer { isLoading = false }
         
+        print("🕒 [Timezone] Starting saveTask")
+        print("🕒 [Timezone] Current timezone: \(TimeZone.current.identifier) (GMT\(TimeZone.current.secondsFromGMT()/3600 >= 0 ? "+" : "")\(TimeZone.current.secondsFromGMT()/3600))")
+        
         let dateFormatter = ISO8601DateFormatter()
         dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)! // Ensure UTC output
         
         var calendar = Calendar.current
-        calendar.timeZone = TimeZone.current
+        calendar.timeZone = TimeZone.current // Use local timezone for date components
         
         let dueDate: Date
         
         if let selectedDate = selectedDate {
+            print("🕒 [Timezone] Selected date in local time: \(selectedDate)")
+            
             if let selectedTime = selectedTime {
+                print("🕒 [Timezone] Selected time in local time: \(selectedTime)")
+                
                 // Combine the selected date with the selected time
                 let timeComponents = calendar.dateComponents([.hour, .minute], from: selectedTime)
+                print("🕒 [Timezone] Time components (local): Hour: \(timeComponents.hour ?? 0), Minute: \(timeComponents.minute ?? 0)")
+                
                 dueDate = calendar.date(
                     bySettingHour: timeComponents.hour ?? 0,
                     minute: timeComponents.minute ?? 0,
                     second: 0,
                     of: selectedDate
                 ) ?? selectedDate
-                print("Debug: Combined date and time - Hour: \(timeComponents.hour ?? 0), Minute: \(timeComponents.minute ?? 0)")
+                
+                print("🕒 [Timezone] Combined local datetime: \(dueDate)")
+                
+                // Convert local time to UTC for API
+                let utcDate = dueDate.addingTimeInterval(Double(-TimeZone.current.secondsFromGMT()))
+                let dueDateString = dateFormatter.string(from: utcDate)
+                print("🕒 [Timezone] Converted to UTC for API: \(dueDateString)")
+                
+                let taskData: [String: Any] = [
+                    "title": taskTitle,
+                    "description": taskDescription,
+                    "priority": selectedPriority?.rawValue ?? "none",
+                    "dueDate": dueDateString,
+                    "hasTime": true,
+                    "projectId": selectedProject?.id ?? inboxProjectId
+                ]
+                
+                do {
+                    let url: URL
+                    var request: URLRequest
+                    
+                    if let existingTask = existingTask {
+                        // Update existing task
+                        url = URL(string: "\(APIConfig.baseURL)/tasks/\(existingTask.id)")!
+                        request = URLRequest(url: url)
+                        request.httpMethod = "PUT"
+                    } else {
+                        // Create new task
+                        url = URL(string: "\(APIConfig.baseURL)/tasks")!
+                        request = URLRequest(url: url)
+                        request.httpMethod = "POST"
+                    }
+                    
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.setValue("application/json", forHTTPHeaderField: "accept")
+                    APIConfig.addAuthHeaders(to: &request)
+                    request.httpBody = try JSONSerialization.data(withJSONObject: taskData)
+                    
+                    let (_, response) = try await URLSession.shared.data(for: request)
+                    
+                    guard let httpResponse = response as? HTTPURLResponse,
+                          (200...299).contains(httpResponse.statusCode) else {
+                        throw URLError(.badServerResponse)
+                    }
+                    
+                    // First call onTaskSaved
+                    await onTaskSaved()
+                    
+                    // Then dismiss the view
+                    await MainActor.run {
+                        dismiss()
+                    }
+                    
+                    // Add a small delay to ensure the view is dismissed
+                    try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                } catch {
+                    print("Network error: \(error)")
+                    self.error = error
+                }
             } else {
-                // No time selected, use start of day
+                // No time selected, use start of day in UTC
                 dueDate = calendar.startOfDay(for: selectedDate)
-                print("Debug: Using start of day")
+                let utcDate = dueDate.addingTimeInterval(Double(-TimeZone.current.secondsFromGMT()))
+                let dueDateString = dateFormatter.string(from: utcDate)
+                
+                let taskData: [String: Any] = [
+                    "title": taskTitle,
+                    "description": taskDescription,
+                    "priority": selectedPriority?.rawValue ?? "none",
+                    "dueDate": dueDateString,
+                    "hasTime": false,
+                    "projectId": selectedProject?.id ?? inboxProjectId
+                ]
+                
+                do {
+                    let url: URL
+                    var request: URLRequest
+                    
+                    if let existingTask = existingTask {
+                        // Update existing task
+                        url = URL(string: "\(APIConfig.baseURL)/tasks/\(existingTask.id)")!
+                        request = URLRequest(url: url)
+                        request.httpMethod = "PUT"
+                    } else {
+                        // Create new task
+                        url = URL(string: "\(APIConfig.baseURL)/tasks")!
+                        request = URLRequest(url: url)
+                        request.httpMethod = "POST"
+                    }
+                    
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.setValue("application/json", forHTTPHeaderField: "accept")
+                    APIConfig.addAuthHeaders(to: &request)
+                    request.httpBody = try JSONSerialization.data(withJSONObject: taskData)
+                    
+                    let (_, response) = try await URLSession.shared.data(for: request)
+                    
+                    guard let httpResponse = response as? HTTPURLResponse,
+                          (200...299).contains(httpResponse.statusCode) else {
+                        throw URLError(.badServerResponse)
+                    }
+                    
+                    // First call onTaskSaved
+                    await onTaskSaved()
+                    
+                    // Then dismiss the view
+                    await MainActor.run {
+                        dismiss()
+                    }
+                    
+                    // Add a small delay to ensure the view is dismissed
+                    try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                } catch {
+                    print("Network error: \(error)")
+                    self.error = error
+                }
             }
         } else {
-            // No date selected, use start of today
+            // No date selected, use start of today in UTC
             dueDate = calendar.startOfDay(for: Date())
-            print("Debug: Using start of today")
-        }
-        
-        let dueDateString = dateFormatter.string(from: dueDate)
-        print("Debug: Final due date string: \(dueDateString)")
-        
-        let taskData: [String: Any] = [
-            "title": taskTitle,
-            "description": taskDescription,
-            "priority": selectedPriority?.rawValue ?? "none",
-            "dueDate": dueDateString,
-            "hasTime": selectedTime != nil,
-            "projectId": selectedProject?.id ?? inboxProjectId
-        ]
-        
-        do {
-            let baseURL = "https://zenith-api-nest-development.up.railway.app/tasks"
-            let url: URL
-            var request: URLRequest
+            let utcDate = dueDate.addingTimeInterval(Double(-TimeZone.current.secondsFromGMT()))
+            let dueDateString = dateFormatter.string(from: utcDate)
             
-            if let existingTask = existingTask {
-                // Update existing task
-                url = URL(string: "\(baseURL)/\(existingTask.id)")!
-                request = URLRequest(url: url)
-                request.httpMethod = "PUT"
-            } else {
-                // Create new task
-                url = URL(string: baseURL)!
-                request = URLRequest(url: url)
-                request.httpMethod = "POST"
+            let taskData: [String: Any] = [
+                "title": taskTitle,
+                "description": taskDescription,
+                "priority": selectedPriority?.rawValue ?? "none",
+                "dueDate": dueDateString,
+                "hasTime": false,
+                "projectId": selectedProject?.id ?? inboxProjectId
+            ]
+            
+            do {
+                let url: URL
+                var request: URLRequest
+                
+                if let existingTask = existingTask {
+                    // Update existing task
+                    url = URL(string: "\(APIConfig.baseURL)/tasks/\(existingTask.id)")!
+                    request = URLRequest(url: url)
+                    request.httpMethod = "PUT"
+                } else {
+                    // Create new task
+                    url = URL(string: "\(APIConfig.baseURL)/tasks")!
+                    request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                }
+                
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue("application/json", forHTTPHeaderField: "accept")
+                APIConfig.addAuthHeaders(to: &request)
+                request.httpBody = try JSONSerialization.data(withJSONObject: taskData)
+                
+                let (_, response) = try await URLSession.shared.data(for: request)
+                
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+                
+                // First call onTaskSaved
+                await onTaskSaved()
+                
+                // Then dismiss the view
+                await MainActor.run {
+                    dismiss()
+                }
+                
+                // Add a small delay to ensure the view is dismissed
+                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            } catch {
+                print("Network error: \(error)")
+                self.error = error
             }
-            
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue("application/json", forHTTPHeaderField: "accept")
-            request.httpBody = try JSONSerialization.data(withJSONObject: taskData)
-            
-            let (_, response) = try await URLSession.shared.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
-                throw URLError(.badServerResponse)
-            }
-            
-            // First call onTaskSaved
-            await onTaskSaved()
-            
-            // Then dismiss the view
-            await MainActor.run {
-                dismiss()
-            }
-            
-            // Add a small delay to ensure the view is dismissed
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-        } catch {
-            print("Network error: \(error)")
-            self.error = error
         }
     }
     
@@ -457,7 +599,7 @@ struct TaskFormView: View {
                                         HStack {
                                             Image(systemName: "tray")
                                                 .frame(width: 24, alignment: .leading)
-                                            Text("Caixa de Entrada")
+                                            Text("Entrada")
                                             Spacer()
                                             if selectedProject?.id == inbox.id {
                                                 Image(systemName: "checkmark")
@@ -494,12 +636,12 @@ struct TaskFormView: View {
                                 let isInbox = selectedProject?.isSystem ?? true // Default to true for inbox
                                 parameterButton(
                                     icon: isInbox ? "tray" : "folder",
-                                    title: isInbox ? "Caixa de Entrada" : (selectedProject?.name ?? "Caixa de Entrada"),
+                                    title: isInbox ? "Entrada" : (selectedProject?.name ?? "Entrada"),
                                     color: isInbox ? nil : (selectedProject.map { Color(hex: $0.color) })
                                 )
                             }
                             .accessibilityIdentifier("project-selector")
-                            .accessibilityLabel(selectedProject?.isSystem == true ? "Caixa de Entrada" : (selectedProject?.name ?? "Caixa de Entrada"))
+                            .accessibilityLabel(selectedProject?.isSystem == true ? "Entrada" : (selectedProject?.name ?? "Entrada"))
                             
                             // Due Date
                             Button(action: {
