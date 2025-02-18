@@ -103,11 +103,72 @@ struct TaskListView: View {
     }
 }
 
+// Task Input Field Component
+struct TaskInputField: View {
+    @Binding var text: String
+    let placeholder: String
+    let onSubmit: () async -> Void
+    @State private var isLoading = false
+    @Environment(\.colorScheme) var colorScheme
+    
+    var backgroundColor: Color {
+        colorScheme == .dark ? Color(white: 0.1) : .white
+    }
+    
+    var textColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            TextField(placeholder, text: $text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 16))
+                .foregroundColor(textColor)
+                .padding(.horizontal, 16)
+                .submitLabel(.send)
+                .onSubmit {
+                    guard !text.isEmpty else { return }
+                    Task {
+                        isLoading = true
+                        await onSubmit()
+                        text = ""
+                        isLoading = false
+                    }
+                }
+            
+            if isLoading {
+                ProgressView()
+                    .padding(.trailing, 16)
+            } else if !text.isEmpty {
+                Button(action: {
+                    Task {
+                        isLoading = true
+                        await onSubmit()
+                        text = ""
+                        isLoading = false
+                    }
+                }) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .foregroundColor(.blue)
+                        .font(.system(size: 24))
+                }
+                .padding(.trailing, 12)
+            }
+        }
+        .frame(height: 50)
+        .background(backgroundColor)
+        .cornerRadius(25)
+    }
+}
+
 struct MainView: View {
     @StateObject private var viewModel = TaskViewModel()
     @State private var showingCreateTask = false
     @State private var isLoading = true
     @State private var hasError = false
+    @State private var taskCommand = ""
+    @State private var selectedTab = 0
     @Environment(\.colorScheme) var colorScheme
     
     var backgroundColor: Color {
@@ -137,70 +198,125 @@ struct MainView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                backgroundColor.edgesIgnoringSafeArea(.all)
+                backgroundColor
+                    .ignoresSafeArea()
                 
-                if isLoading {
-                    ProgressView()
-                } else if hasError {
-                    ErrorView(
-                        secondaryTextColor: secondaryTextColor,
-                        textColor: textColor,
-                        retryAction: {
-                            Task {
-                                isLoading = true
-                                hasError = false
-                                do {
-                                    try await viewModel.loadTasks(forToday: true)
-                                    isLoading = false
-                                } catch {
-                                    isLoading = false
-                                    hasError = true
+                VStack(spacing: 0) {
+                    if isLoading {
+                        ProgressView()
+                    } else if hasError {
+                        ErrorView(
+                            secondaryTextColor: secondaryTextColor,
+                            textColor: textColor,
+                            retryAction: {
+                                Task {
+                                    isLoading = true
+                                    hasError = false
+                                    do {
+                                        try await viewModel.loadAllTasks()
+                                        isLoading = false
+                                    } catch {
+                                        isLoading = false
+                                        hasError = true
+                                    }
                                 }
                             }
-                        }
-                    )
-                } else {
-                    VStack(spacing: 16) {
-                        // Header section
-                        VStack(alignment: .leading) {
-                            Text("Quinta - 6 Fev")
-                                .font(.subheadline)
-                                .foregroundColor(secondaryTextColor)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
-                        
-                        TaskListView(
-                            showingCreateTask: $showingCreateTask,
-                            tasks: viewModel.tasks,
-                            secondaryTextColor: secondaryTextColor,
-                            cardBackgroundColor: cardBackgroundColor,
-                            onTaskCreated: {
-                                await viewModel.refreshTasks(forToday: true)
-                            },
-                            viewModel: viewModel
                         )
-                        
-                        Spacer()
-                        
-                        // Start focus button
-                        Button(action: {
-                            print("Focus Session Started")
-                        }) {
-                            Text("Iniciar Foco")
-                                .foregroundColor(backgroundColor)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(textColor)
-                                .font(.system(size: 16, weight: .semibold))
-                                .cornerRadius(25)
+                    } else {
+                        // Main content
+                        VStack(spacing: 0) {
+                            if !viewModel.overdueTasks.isEmpty {
+                                TabView(selection: $selectedTab) {
+                                    // Overdue Section
+                                    TaskSectionView(
+                                        title: "Atrasadas",
+                                        tasks: viewModel.overdueTasks,
+                                        secondaryTextColor: secondaryTextColor,
+                                        cardBackgroundColor: cardBackgroundColor,
+                                        onTaskCreated: {
+                                            do {
+                                                try await viewModel.loadAllTasks()
+                                            } catch {
+                                                print("Error refreshing tasks: \(error)")
+                                            }
+                                        },
+                                        viewModel: viewModel,
+                                        showingCreateTask: $showingCreateTask
+                                    )
+                                    .tag(0)
+                                    
+                                    // Today Section
+                                    TaskSectionView(
+                                        title: "Hoje",
+                                        tasks: viewModel.tasks,
+                                        secondaryTextColor: secondaryTextColor,
+                                        cardBackgroundColor: cardBackgroundColor,
+                                        onTaskCreated: {
+                                            do {
+                                                try await viewModel.loadAllTasks()
+                                            } catch {
+                                                print("Error refreshing tasks: \(error)")
+                                            }
+                                        },
+                                        viewModel: viewModel,
+                                        showingCreateTask: $showingCreateTask
+                                    )
+                                    .tag(1)
+                                }
+                                .tabViewStyle(.page)
+                                .indexViewStyle(.page(backgroundDisplayMode: .always))
+                            } else {
+                                TaskSectionView(
+                                    title: "Hoje",
+                                    tasks: viewModel.tasks,
+                                    secondaryTextColor: secondaryTextColor,
+                                    cardBackgroundColor: cardBackgroundColor,
+                                    onTaskCreated: {
+                                        do {
+                                            try await viewModel.loadAllTasks()
+                                        } catch {
+                                            print("Error refreshing tasks: \(error)")
+                                        }
+                                    },
+                                    viewModel: viewModel,
+                                    showingCreateTask: $showingCreateTask
+                                )
+                            }
+                            
+                            Spacer()
+                            
+                            // Input field at bottom
+                            TaskInputField(
+                                text: $taskCommand,
+                                placeholder: "Descreva sua tarefa...",
+                                onSubmit: {
+                                    do {
+                                        try await viewModel.createTaskFromNaturalLanguage(taskCommand)
+                                    } catch {
+                                        print("Error creating task: \(error)")
+                                    }
+                                }
+                            )
+                            .padding(.horizontal)
+                            .padding(.bottom)
                         }
-                        .padding(.horizontal)
-                        .padding(.bottom)
                     }
                 }
             }
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text(viewModel.greeting)
+                            .font(.headline)
+                            .foregroundColor(textColor)
+                        
+                        Text(viewModel.formattedDate)
+                            .font(.subheadline)
+                            .foregroundColor(secondaryTextColor)
+                    }
+                }
+                
                 ToolbarItem(placement: .automatic) {
                     Text("Energia Mental")
                         .foregroundColor(secondaryTextColor)
@@ -210,23 +326,13 @@ struct MainView: View {
             .task {
                 do {
                     isLoading = true
-                    try await viewModel.loadTasks(forToday: true)
+                    try await viewModel.loadAllTasks()
                     isLoading = false
                 } catch {
                     isLoading = false
                     hasError = true
                 }
             }
-            .refreshable {
-                do {
-                    hasError = false
-                    try await viewModel.loadTasks(forToday: true)
-                } catch {
-                    hasError = true
-                }
-            }
-            .navigationTitle("Hoje")
-            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
