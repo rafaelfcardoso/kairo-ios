@@ -244,6 +244,13 @@ struct MainView: View {
                                         showingCreateTask: $showingCreateTask
                                     )
                                     .tag(0)
+                                    .refreshable {
+                                        do {
+                                            try await viewModel.loadAllTasks()
+                                        } catch {
+                                            print("Error refreshing tasks: \(error)")
+                                        }
+                                    }
                                     
                                     // Today Section
                                     TaskSectionView(
@@ -262,6 +269,13 @@ struct MainView: View {
                                         showingCreateTask: $showingCreateTask
                                     )
                                     .tag(1)
+                                    .refreshable {
+                                        do {
+                                            try await viewModel.loadAllTasks()
+                                        } catch {
+                                            print("Error refreshing tasks: \(error)")
+                                        }
+                                    }
                                 }
                                 .tabViewStyle(.page)
                                 .indexViewStyle(.page(backgroundDisplayMode: .always))
@@ -281,6 +295,13 @@ struct MainView: View {
                                     viewModel: viewModel,
                                     showingCreateTask: $showingCreateTask
                                 )
+                                .refreshable {
+                                    do {
+                                        try await viewModel.loadAllTasks()
+                                    } catch {
+                                        print("Error refreshing tasks: \(error)")
+                                    }
+                                }
                             }
                             
                             Spacer()
@@ -384,15 +405,23 @@ struct TaskRow: View {
         
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        formatter.timeZone = TimeZone(identifier: "UTC")! // Ensure UTC parsing
         
-        guard let date = formatter.date(from: dueDateString) else {
+        guard let utcDate = formatter.date(from: dueDateString) else {
             return nil
         }
         
+        // Convert UTC to local time
+        let localDate = utcDate.addingTimeInterval(Double(TimeZone.current.secondsFromGMT()))
+        
+        // Format in local timezone
         let timeFormatter = DateFormatter()
         timeFormatter.timeStyle = .short
         timeFormatter.dateStyle = .none
-        return timeFormatter.string(from: date)
+        timeFormatter.timeZone = TimeZone.current // Local timezone for display
+        timeFormatter.locale = Locale.current // Ensure proper local formatting
+        
+        return timeFormatter.string(from: localDate)
     }
     
     private var formattedDate: String? {
@@ -402,15 +431,18 @@ struct TaskRow: View {
         
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        formatter.timeZone = TimeZone(identifier: "UTC")! // Ensure UTC parsing
         
-        guard let date = formatter.date(from: dueDateString) else {
+        guard let utcDate = formatter.date(from: dueDateString) else {
             return nil
         }
         
         let dateFormatter = DateFormatter()
+        dateFormatter.timeZone = TimeZone.current // Local timezone for display
         dateFormatter.locale = Locale(identifier: "pt_BR")
         dateFormatter.dateFormat = "d MMM"  // Direct format instead of template
-        let fullDate = dateFormatter.string(from: date)
+        
+        let fullDate = dateFormatter.string(from: utcDate)
         // Convert month to uppercase and remove any "de" that might appear
         return fullDate.replacingOccurrences(of: " de ", with: " ")
             .replacingOccurrences(of: ". ", with: " ")
@@ -471,12 +503,14 @@ struct TaskRow: View {
                                 .font(.system(size: 12))
                             Text(date)
                                 .font(.caption)
+                            if let time = formattedTime {
+                                Text(time)
+                                    .font(.caption)
+                            }
                         }
                         .padding(.vertical, 4)
                         .foregroundColor(timeColor)
-                    }
-                    
-                    if let time = formattedTime {
+                    } else if let time = formattedTime {
                         HStack(spacing: 4) {
                             Image(systemName: "clock")
                                 .font(.system(size: 12))

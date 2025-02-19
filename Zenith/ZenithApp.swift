@@ -7,88 +7,163 @@
 
 import SwiftUI
 
-@main
-struct ZenithApp: App {
-    @Environment(\.colorScheme) var colorScheme
-    @State private var selectedTab: Tab = .today
+// MARK: - Theme
+@Observable final class AppTheme {
+    static let shared = AppTheme()
     
-    enum Tab {
-        case dashboard
-        case today
-    }
+    var colorScheme: ColorScheme = .light
     
     var backgroundColor: Color {
-        colorScheme == .dark ? .black : Color(hex: "F1F2F4")
+        colorScheme == .dark ? .black : .white
     }
     
     var activeColor: Color {
-        colorScheme == .dark ? Color(hex: "F1F2F4") : .black
+        colorScheme == .dark ? .white : .black
     }
     
     var inactiveColor: Color {
         Color(hex: "7E7E7E")
     }
     
-    var body: some Scene {
-        WindowGroup {
-            TabView(selection: $selectedTab) {
-                DashboardView()
-                    .tabItem {
-                        Label("Dashboard", systemImage: "rectangle.stack.fill")
-                            .environment(\.symbolVariants, selectedTab == .dashboard ? .fill : .none)
-                    }
-                    .tag(Tab.dashboard)
-                
-                MainView()
-                    .tabItem {
-                        Label("Hoje", systemImage: "filemenu.and.selection")
-                            .environment(\.symbolVariants, selectedTab == .today ? .fill : .none)
-                    }
-                    .tag(Tab.today)
-            }
-            .tint(activeColor)
-            .background(backgroundColor)
+    private init() {}
+}
+
+// MARK: - Tab Bar Style
+struct CustomTabBarStyle: ViewModifier {
+    @Environment(\.colorScheme) var colorScheme
+    
+    func body(content: Content) -> some View {
+        content
             .onAppear {
-                // Customize unselected tab item color
-                let unselectedColor = UIColor(red: 126/255, green: 126/255, blue: 126/255, alpha: 1)
-                UITabBar.appearance().unselectedItemTintColor = unselectedColor
+                updateTabBarAppearance()
             }
+            .onChange(of: colorScheme) { _, _ in
+                updateTabBarAppearance()
+            }
+    }
+    
+    private func updateTabBarAppearance() {
+        let appearance = UITabBarAppearance()
+        
+        // Background configuration
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundColor = UIColor(colorScheme == .dark ? .black : Color(hex: "F1F2F4"))
+        
+        // Normal state
+        let normalColor = UIColor(AppTheme.shared.inactiveColor)
+        appearance.stackedLayoutAppearance.normal.iconColor = normalColor
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: normalColor]
+        
+        // Selected state
+        let selectedColor = colorScheme == .dark ? UIColor.white : UIColor.black
+        appearance.stackedLayoutAppearance.selected.iconColor = selectedColor
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: selectedColor]
+        
+        // Apply appearance
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+}
+
+// MARK: - Main Navigation
+enum Tab: Hashable {
+    case dashboard
+    case today
+    case blocks
+    
+    var title: String {
+        switch self {
+        case .dashboard: return "Dashboard"
+        case .today: return "Hoje"
+        case .blocks: return "Blocks"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .dashboard: return "rectangle.stack.fill"
+        case .today: return "filemenu.and.selection"
+        case .blocks: return "rectangle.stack.badge.plus"
         }
     }
 }
 
-struct ZenithApp_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            TabView {
+// MARK: - Main App
+@main
+struct ZenithApp: App {
+    @State private var selectedTab: Tab = .today
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some Scene {
+        WindowGroup {
+            TabView(selection: $selectedTab) {
                 DashboardView()
+                    .tag(Tab.dashboard)
                     .tabItem {
-                        Label("Dashboard", systemImage: "rectangle.stack.fill")
+                        Label(Tab.dashboard.title, systemImage: Tab.dashboard.icon)
+                            .environment(\.symbolVariants, selectedTab == .dashboard ? .fill : .none)
                     }
                 
                 MainView()
+                    .tag(Tab.today)
                     .tabItem {
-                        Label("Hoje", systemImage: "filemenu.and.selection")
-                    }
-            }
-            .accentColor(.white)
-            .preferredColorScheme(.dark)
-            .previewDisplayName("Dark Mode")
-            
-            TabView {
-                DashboardView()
-                    .tabItem {
-                        Label("Dashboard", systemImage: "rectangle.stack.fill")
+                        Label(Tab.today.title, systemImage: Tab.today.icon)
+                            .environment(\.symbolVariants, selectedTab == .today ? .fill : .none)
                     }
                 
-                MainView()
+                BlocksView()
+                    .tag(Tab.blocks)
                     .tabItem {
-                        Label("Hoje", systemImage: "filemenu.and.selection")
+                        Label(Tab.blocks.title, systemImage: Tab.blocks.icon)
+                            .environment(\.symbolVariants, selectedTab == .blocks ? .fill : .none)
                     }
             }
-            .accentColor(.black)
-            .preferredColorScheme(.light)
-            .previewDisplayName("Light Mode")
+            .onChange(of: colorScheme) { _, newValue in
+                AppTheme.shared.colorScheme = newValue
+            }
+            .modifier(CustomTabBarStyle())
+            .tint(AppTheme.shared.activeColor)
         }
     }
+}
+
+// MARK: - Preview Provider
+#Preview("Light Mode") {
+    TabView {
+        DashboardView()
+            .tabItem {
+                Label(Tab.dashboard.title, systemImage: Tab.dashboard.icon)
+            }
+        
+        MainView()
+            .tabItem {
+                Label(Tab.today.title, systemImage: Tab.today.icon)
+            }
+        
+        BlocksView()
+            .tabItem {
+                Label(Tab.blocks.title, systemImage: Tab.blocks.icon)
+            }
+    }
+    .preferredColorScheme(.light)
+}
+
+#Preview("Dark Mode") {
+    TabView {
+        DashboardView()
+            .tabItem {
+                Label(Tab.dashboard.title, systemImage: Tab.dashboard.icon)
+            }
+        
+        MainView()
+            .tabItem {
+                Label(Tab.today.title, systemImage: Tab.today.icon)
+            }
+        
+        BlocksView()
+            .tabItem {
+                Label(Tab.blocks.title, systemImage: Tab.blocks.icon)
+            }
+    }
+    .preferredColorScheme(.dark)
 }
