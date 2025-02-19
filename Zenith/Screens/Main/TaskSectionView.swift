@@ -22,7 +22,11 @@ struct TaskSectionView: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(tasks) { task in
-                        TaskRow(task: task, viewModel: viewModel)
+                        TaskRow(
+                            task: task,
+                            viewModel: viewModel,
+                            isOverdue: title == "Atrasadas"
+                        )
                     }
                     
                     if title == "Hoje" {

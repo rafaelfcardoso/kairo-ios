@@ -54,7 +54,7 @@ struct TaskListView: View {
         ScrollView {
             LazyVStack(spacing: 12) {
                 ForEach(tasks) { task in
-                    TaskRow(task: task, viewModel: viewModel)
+                    TaskRow(task: task, viewModel: viewModel, isOverdue: false)
                 }
                 
                 Button(action: {
@@ -341,6 +341,7 @@ struct MainView: View {
 struct TaskRow: View {
     let task: TodoTask
     let viewModel: TaskViewModel
+    let isOverdue: Bool
     @Environment(\.colorScheme) var colorScheme
     @State private var isCompleting = false
     @State private var showingEditTask = false
@@ -355,6 +356,10 @@ struct TaskRow: View {
     
     var secondaryTextColor: Color {
         colorScheme == .dark ? .gray : .secondary
+    }
+    
+    var timeColor: Color {
+        isOverdue ? .red : .green
     }
     
     var circleColor: Color {
@@ -388,6 +393,29 @@ struct TaskRow: View {
         timeFormatter.timeStyle = .short
         timeFormatter.dateStyle = .none
         return timeFormatter.string(from: date)
+    }
+    
+    private var formattedDate: String? {
+        guard let dueDateString = task.dueDate else {
+            return nil
+        }
+        
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        guard let date = formatter.date(from: dueDateString) else {
+            return nil
+        }
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "pt_BR")
+        dateFormatter.dateFormat = "d MMM"  // Direct format instead of template
+        let fullDate = dateFormatter.string(from: date)
+        // Convert month to uppercase and remove any "de" that might appear
+        return fullDate.replacingOccurrences(of: " de ", with: " ")
+            .replacingOccurrences(of: ". ", with: " ")
+            .replacingOccurrences(of: ".", with: "")
+            .replacingOccurrences(of: " ([a-zA-Z])", with: " $1".uppercased(), options: .regularExpression)
     }
     
     var body: some View {
@@ -437,6 +465,17 @@ struct TaskRow: View {
                 }
                 
                 HStack(spacing: 8) {
+                    if isOverdue, let date = formattedDate {
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 12))
+                            Text(date)
+                                .font(.caption)
+                        }
+                        .padding(.vertical, 4)
+                        .foregroundColor(timeColor)
+                    }
+                    
                     if let time = formattedTime {
                         HStack(spacing: 4) {
                             Image(systemName: "clock")
@@ -445,8 +484,9 @@ struct TaskRow: View {
                                 .font(.caption)
                         }
                         .padding(.vertical, 4)
-                        .foregroundColor(.green)
+                        .foregroundColor(timeColor)
                     }
+                    
                     if task.project == nil {
                         HStack(spacing: 4) {
                             Image(systemName: "tray")

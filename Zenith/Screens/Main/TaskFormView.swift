@@ -34,6 +34,7 @@ struct DateSelectionView: View {
     @Binding var selectedTime: Date?
     @State private var showingTimePicker = false
     @State private var tempTime: Date? = nil
+    let onDismiss: () -> Void
     
     var textColor: Color {
         colorScheme == .dark ? .white : .black
@@ -57,17 +58,21 @@ struct DateSelectionView: View {
         let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
         print("Debug: Applying time components - Hour: \(timeComponents.hour ?? 0), Minute: \(timeComponents.minute ?? 0)")
         return calendar.date(bySettingHour: timeComponents.hour ?? 0,
-                           minute: timeComponents.minute ?? 0,
-                           second: 0,
-                           of: date) ?? date
+                            minute: timeComponents.minute ?? 0,
+                            second: 0,
+                            of: date) ?? date
     }
     
     private func handleDismiss() {
-        if let date = selectedDate {
+        if selectedDate == nil {
+            // If "Hoje" was selected, set it to today's date
+            selectedDate = Calendar.current.startOfDay(for: Date())
+        } else if let date = selectedDate {
             // Always apply the time if it's set, even for initial task creation
             selectedDate = applyTimeToDate(date)
-            print("Debug: Final selected date with time: \(selectedDate?.description ?? "nil")")
         }
+        print("Debug: Final selected date with time: \(selectedDate?.description ?? "nil")")
+        onDismiss()
         dismiss()
     }
     
@@ -78,14 +83,14 @@ struct DateSelectionView: View {
                     HStack {
                         Text("Hoje")
                         Spacer()
-                        if selectedDate == nil {
+                        if Calendar.current.isDateInToday(selectedDate ?? Date()) {
                             Image(systemName: "checkmark")
                                 .foregroundColor(.blue)
                         }
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        selectedDate = nil
+                        selectedDate = Calendar.current.startOfDay(for: Date())
                         selectedTime = nil
                     }
                     
@@ -93,7 +98,7 @@ struct DateSelectionView: View {
                         Text("Amanhã")
                         Spacer()
                         if let date = selectedDate,
-                           Calendar.current.isDateInTomorrow(date) {
+                            Calendar.current.isDateInTomorrow(date) {
                             Image(systemName: "checkmark")
                                 .foregroundColor(.blue)
                         }
@@ -145,7 +150,7 @@ struct DateSelectionView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancelar") {
-                        dismiss()
+                        handleDismiss()
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -188,6 +193,50 @@ struct TaskFormView: View {
     private let inboxProjectId = "569c363f-1934-4e69-b324-6c2fad28bc59"
     let existingTask: TodoTask?
     var onTaskSaved: @Sendable () async -> Void
+    
+    var isOverdue: Bool {
+        guard let task = existingTask,
+                let dueDateString = task.dueDate,
+                let dueDate = ISO8601DateFormatter().date(from: dueDateString) else {
+            return false
+        }
+        return dueDate < Date()
+    }
+    
+    var dateColor: Color {
+        isOverdue ? .red : .green
+    }
+    
+    private func formattedDate(_ date: Date) -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "pt_BR")
+        dateFormatter.dateFormat = "d MMM"
+        let fullDate = dateFormatter.string(from: date)
+        return fullDate.replacingOccurrences(of: " de ", with: " ")
+            .replacingOccurrences(of: ". ", with: " ")
+            .replacingOccurrences(of: ".", with: "")
+            .replacingOccurrences(of: " ([a-zA-Z])", with: " $1".uppercased(), options: .regularExpression)
+    }
+    
+    var formattedSelectedDate: String {
+        guard let date = selectedDate else { return "Data" }
+        
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            return "Hoje"
+        } else if calendar.isDateInTomorrow(date) {
+            return "Amanhã"
+        }
+        return formattedDate(date)
+    }
+    
+    var dateButtonColor: Color {
+        if let selectedDate = selectedDate {
+            // Check if the selected date is in the past
+            return selectedDate < Calendar.current.startOfDay(for: Date()) ? .red : .green
+        }
+        return .green
+    }
     
     init(task: TodoTask? = nil, viewModel: TaskViewModel, onTaskSaved: @escaping @Sendable () async -> Void) {
         self.existingTask = task
@@ -311,20 +360,6 @@ struct TaskFormView: View {
         selectedPriority?.color ?? secondaryTextColor
     }
     
-    var formattedSelectedDate: String {
-        guard let date = selectedDate else { return "Hoje" }
-        let calendar = Calendar.current
-        if calendar.isDateInToday(date) {
-            return "Hoje"
-        } else if calendar.isDateInTomorrow(date) {
-            return "Amanhã"
-        } else if calendar.isDateInWeekend(date) {
-            return "Sábado"
-        } else {
-            return date.formatted(date: .abbreviated, time: .omitted)
-        }
-    }
-    
     private func saveTask() async {
         guard !taskTitle.isEmpty else { return }
         
@@ -341,11 +376,14 @@ struct TaskFormView: View {
         var calendar = Calendar.current
         calendar.timeZone = TimeZone.current // Use local timezone for date components
         
-        let dueDate: Date
+        // Prepare the due date string and hasTime flag
+        let dueDateString: String?
+        let hasTime: Bool
         
         if let selectedDate = selectedDate {
             print("🕒 [Timezone] Selected date in local time: \(selectedDate)")
             
+            let dueDate: Date
             if let selectedTime = selectedTime {
                 print("🕒 [Timezone] Selected time in local time: \(selectedTime)")
                 
@@ -360,179 +398,95 @@ struct TaskFormView: View {
                     of: selectedDate
                 ) ?? selectedDate
                 
-                print("🕒 [Timezone] Combined local datetime: \(dueDate)")
-                
-                // Convert local time to UTC for API
-                let utcDate = dueDate.addingTimeInterval(Double(-TimeZone.current.secondsFromGMT()))
-                let dueDateString = dateFormatter.string(from: utcDate)
-                print("🕒 [Timezone] Converted to UTC for API: \(dueDateString)")
-                
-                let taskData: [String: Any] = [
-                    "title": taskTitle,
-                    "description": taskDescription,
-                    "priority": selectedPriority?.rawValue ?? "none",
-                    "dueDate": dueDateString,
-                    "hasTime": true,
-                    "projectId": selectedProject?.id ?? inboxProjectId
-                ]
-                
-                do {
-                    let url: URL
-                    var request: URLRequest
-                    
-                    if let existingTask = existingTask {
-                        // Update existing task
-                        url = URL(string: "\(APIConfig.baseURL)/tasks/\(existingTask.id)")!
-                        request = URLRequest(url: url)
-                        request.httpMethod = "PUT"
-                    } else {
-                        // Create new task
-                        url = URL(string: "\(APIConfig.baseURL)/tasks")!
-                        request = URLRequest(url: url)
-                        request.httpMethod = "POST"
-                    }
-                    
-                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    request.setValue("application/json", forHTTPHeaderField: "accept")
-                    APIConfig.addAuthHeaders(to: &request)
-                    request.httpBody = try JSONSerialization.data(withJSONObject: taskData)
-                    
-                    let (_, response) = try await URLSession.shared.data(for: request)
-                    
-                    guard let httpResponse = response as? HTTPURLResponse,
-                          (200...299).contains(httpResponse.statusCode) else {
-                        throw URLError(.badServerResponse)
-                    }
-                    
-                    // First call onTaskSaved
-                    await onTaskSaved()
-                    
-                    // Then dismiss the view
-                    await MainActor.run {
-                        dismiss()
-                    }
-                    
-                    // Add a small delay to ensure the view is dismissed
-                    try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                } catch {
-                    print("Network error: \(error)")
-                    self.error = error
-                }
+                hasTime = true
             } else {
-                // No time selected, use start of day in UTC
                 dueDate = calendar.startOfDay(for: selectedDate)
-                let utcDate = dueDate.addingTimeInterval(Double(-TimeZone.current.secondsFromGMT()))
-                let dueDateString = dateFormatter.string(from: utcDate)
-                
-                let taskData: [String: Any] = [
-                    "title": taskTitle,
-                    "description": taskDescription,
-                    "priority": selectedPriority?.rawValue ?? "none",
-                    "dueDate": dueDateString,
-                    "hasTime": false,
-                    "projectId": selectedProject?.id ?? inboxProjectId
-                ]
-                
-                do {
-                    let url: URL
-                    var request: URLRequest
-                    
-                    if let existingTask = existingTask {
-                        // Update existing task
-                        url = URL(string: "\(APIConfig.baseURL)/tasks/\(existingTask.id)")!
-                        request = URLRequest(url: url)
-                        request.httpMethod = "PUT"
-                    } else {
-                        // Create new task
-                        url = URL(string: "\(APIConfig.baseURL)/tasks")!
-                        request = URLRequest(url: url)
-                        request.httpMethod = "POST"
-                    }
-                    
-                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    request.setValue("application/json", forHTTPHeaderField: "accept")
-                    APIConfig.addAuthHeaders(to: &request)
-                    request.httpBody = try JSONSerialization.data(withJSONObject: taskData)
-                    
-                    let (_, response) = try await URLSession.shared.data(for: request)
-                    
-                    guard let httpResponse = response as? HTTPURLResponse,
-                          (200...299).contains(httpResponse.statusCode) else {
-                        throw URLError(.badServerResponse)
-                    }
-                    
-                    // First call onTaskSaved
-                    await onTaskSaved()
-                    
-                    // Then dismiss the view
-                    await MainActor.run {
-                        dismiss()
-                    }
-                    
-                    // Add a small delay to ensure the view is dismissed
-                    try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                } catch {
-                    print("Network error: \(error)")
-                    self.error = error
-                }
+                hasTime = false
             }
-        } else {
-            // No date selected, use start of today in UTC
-            dueDate = calendar.startOfDay(for: Date())
+            
+            // Convert local time to UTC for API
             let utcDate = dueDate.addingTimeInterval(Double(-TimeZone.current.secondsFromGMT()))
-            let dueDateString = dateFormatter.string(from: utcDate)
+            dueDateString = dateFormatter.string(from: utcDate)
+            print("🕒 [Timezone] Converted to UTC for API: \(dueDateString ?? "nil")")
+        } else {
+            dueDateString = nil
+            hasTime = false
+        }
+        
+        let taskData: [String: Any] = [
+            "title": taskTitle,
+            "description": taskDescription,
+            "priority": selectedPriority?.rawValue ?? "none",
+            "projectId": selectedProject?.id ?? inboxProjectId
+        ].merging([
+            "dueDate": dueDateString as Any,
+            "hasTime": hasTime
+        ]) { (_, new) in new }
+        
+        print("🌐 [API] Task data: \(taskData)")
+        
+        do {
+            let url: URL
+            var request: URLRequest
             
-            let taskData: [String: Any] = [
-                "title": taskTitle,
-                "description": taskDescription,
-                "priority": selectedPriority?.rawValue ?? "none",
-                "dueDate": dueDateString,
-                "hasTime": false,
-                "projectId": selectedProject?.id ?? inboxProjectId
-            ]
+            if let existingTask = existingTask {
+                // Update existing task
+                url = URL(string: "\(APIConfig.baseURL)\(APIConfig.apiPath)/tasks/\(existingTask.id)")!
+                request = URLRequest(url: url)
+                request.httpMethod = "PUT"
+            } else {
+                // Create new task
+                url = URL(string: "\(APIConfig.baseURL)\(APIConfig.apiPath)/tasks")!
+                request = URLRequest(url: url)
+                request.httpMethod = "POST"
+            }
             
-            do {
-                let url: URL
-                var request: URLRequest
-                
-                if let existingTask = existingTask {
-                    // Update existing task
-                    url = URL(string: "\(APIConfig.baseURL)/tasks/\(existingTask.id)")!
-                    request = URLRequest(url: url)
-                    request.httpMethod = "PUT"
-                } else {
-                    // Create new task
-                    url = URL(string: "\(APIConfig.baseURL)/tasks")!
-                    request = URLRequest(url: url)
-                    request.httpMethod = "POST"
-                }
-                
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                request.setValue("application/json", forHTTPHeaderField: "accept")
-                APIConfig.addAuthHeaders(to: &request)
-                request.httpBody = try JSONSerialization.data(withJSONObject: taskData)
-                
-                let (_, response) = try await URLSession.shared.data(for: request)
-                
-                guard let httpResponse = response as? HTTPURLResponse,
-                      (200...299).contains(httpResponse.statusCode) else {
-                    throw URLError(.badServerResponse)
-                }
-                
-                // First call onTaskSaved
-                await onTaskSaved()
-                
-                // Then dismiss the view
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "accept")
+            APIConfig.addAuthHeaders(to: &request)
+            
+            let jsonData = try JSONSerialization.data(withJSONObject: taskData)
+            request.httpBody = jsonData
+            
+            print("🌐 [API] Request URL: \(url)")
+            print("🌐 [API] Request Method: \(request.httpMethod ?? "Unknown")")
+            print("🌐 [API] Request Headers: \(request.allHTTPHeaderFields ?? [:])")
+            if let bodyString = String(data: jsonData, encoding: .utf8) {
+                print("🌐 [API] Request Body: \(bodyString)")
+            }
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw URLError(.badServerResponse)
+            }
+            
+            print("🌐 [API] Response Status Code: \(httpResponse.statusCode)")
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("🌐 [API] Response Body: \(responseString)")
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                throw URLError(.badServerResponse)
+            }
+            
+            // Decode the response to get the updated task
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("🌐 [API] Response Body: \(responseString)")
+            }
+            
+            // First call onTaskSaved to refresh the task lists
+            await onTaskSaved()
+            
+            // Only dismiss if this is a new task creation
+            if existingTask == nil {
                 await MainActor.run {
                     dismiss()
                 }
-                
-                // Add a small delay to ensure the view is dismissed
-                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            } catch {
-                print("Network error: \(error)")
-                self.error = error
             }
+        } catch {
+            print("Network error: \(error)")
+            self.error = error
         }
     }
     
@@ -595,6 +549,11 @@ struct TaskFormView: View {
                                 if let inbox = projectViewModel.projects.first(where: { $0.isSystem }) {
                                     Button {
                                         selectedProject = inbox
+                                        if existingTask != nil {
+                                            Task {
+                                                await saveTask()
+                                            }
+                                        }
                                     } label: {
                                         HStack {
                                             Image(systemName: "tray")
@@ -616,6 +575,11 @@ struct TaskFormView: View {
                                 ForEach(projectViewModel.projects.filter { !$0.isArchived && !$0.isSystem }, id: \.id) { project in
                                     Button {
                                         selectedProject = project
+                                        if existingTask != nil {
+                                            Task {
+                                                await saveTask()
+                                            }
+                                        }
                                     } label: {
                                         HStack {
                                             Image(systemName: "folder.fill")
@@ -650,11 +614,35 @@ struct TaskFormView: View {
                                 parameterButton(
                                     icon: "calendar",
                                     title: formattedSelectedDate,
-                                    color: selectedDate == nil ? .green : nil
+                                    color: dateButtonColor
                                 )
                             }
                             .sheet(isPresented: $showingDatePicker) {
-                                DateSelectionView(selectedDate: $selectedDate, selectedTime: $selectedTime)
+                                DateSelectionView(
+                                    selectedDate: Binding(
+                                        get: { selectedDate },
+                                        set: { newDate in
+                                            selectedDate = newDate
+                                        }
+                                    ),
+                                    selectedTime: Binding(
+                                        get: { selectedTime },
+                                        set: { newTime in
+                                            selectedTime = newTime
+                                        }
+                                    ),
+                                    onDismiss: {
+                                        if existingTask != nil {
+                                            Task {
+                                                isLoading = true
+                                                await saveTask()
+                                                // Ensure we refresh both task lists
+                                                try? await viewModel.loadAllTasks()
+                                                isLoading = false
+                                            }
+                                        }
+                                    }
+                                )
                             }
                             
                             // Priority
@@ -662,6 +650,11 @@ struct TaskFormView: View {
                                 ForEach(Priority.allCases, id: \.self) { priority in
                                     Button {
                                         selectedPriority = priority
+                                        if existingTask != nil {
+                                            Task {
+                                                await saveTask()
+                                            }
+                                        }
                                     } label: {
                                         Text(priority.displayName)
                                             .foregroundColor(textColor)
@@ -694,26 +687,7 @@ struct TaskFormView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if existingTask != nil {
-                        HStack(spacing: 16) {
-                            Button("Salvar") {
-                                Task {
-                                    await saveTask()
-                                }
-                            }
-                            .bold()
-                            .foregroundColor(textColor)
-                            .disabled(taskTitle.isEmpty || isLoading)
-                            
-                            Button(action: {
-                                // TODO: Show more actions menu
-                            }) {
-                                Image(systemName: "ellipsis")
-                                    .foregroundColor(textColor)
-                            }
-                            .disabled(isLoading)
-                        }
-                    } else {
+                    if existingTask == nil {
                         Button("Concluir") {
                             Task {
                                 await saveTask()
@@ -722,6 +696,14 @@ struct TaskFormView: View {
                         .bold()
                         .foregroundColor(textColor)
                         .disabled(taskTitle.isEmpty || isLoading)
+                    } else {
+                        Button(action: {
+                            // TODO: Show more actions menu
+                        }) {
+                            Image(systemName: "ellipsis")
+                                .foregroundColor(textColor)
+                        }
+                        .disabled(isLoading)
                     }
                 }
             }
@@ -751,7 +733,7 @@ struct TaskFormView: View {
             Image(systemName: icon)
                 .foregroundColor(color ?? secondaryTextColor)
             Text(title)
-                .foregroundColor(color ?? textColor)
+                .foregroundColor(color ?? secondaryTextColor)
         }
         .font(.system(size: 14))
         .padding(.horizontal, 12)
