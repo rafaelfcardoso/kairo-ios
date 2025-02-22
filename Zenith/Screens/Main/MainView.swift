@@ -40,134 +40,11 @@ struct ErrorView: View {
     }
 }
 
-// Task List Component
-struct TaskListView: View {
-    @Binding var showingCreateTask: Bool
-    let tasks: [TodoTask]
-    let secondaryTextColor: Color
-    let cardBackgroundColor: Color
-    let onTaskCreated: @Sendable () async -> Void
-    let viewModel: TaskViewModel
-    @State private var shouldRefresh = false
-    
-    var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(tasks) { task in
-                    TaskRow(task: task, viewModel: viewModel, isOverdue: false)
-                }
-                
-                Button(action: {
-                    showingCreateTask = true
-                }) {
-                    HStack {
-                        Image(systemName: "plus")
-                        Text("Adicionar tarefa")
-                    }
-                    .foregroundColor(secondaryTextColor)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(cardBackgroundColor)
-                    .cornerRadius(12)
-                }
-                .accessibilityIdentifier("add-task-button")
-                .sheet(isPresented: $showingCreateTask) {
-                    TaskFormView(
-                        viewModel: viewModel,
-                        onTaskSaved: {
-                            await MainActor.run {
-                                shouldRefresh = true
-                            }
-                            await onTaskCreated()
-                            await MainActor.run {
-                                shouldRefresh = false
-                            }
-                        }
-                    )
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
-                    .interactiveDismissDisabled(false)
-                }
-            }
-            .padding(.horizontal)
-        }
-        .task(id: shouldRefresh) {
-            if shouldRefresh {
-                await onTaskCreated()
-                await MainActor.run {
-                    shouldRefresh = false
-                }
-            }
-        }
-    }
-}
-
-// Task Input Field Component
-struct TaskInputField: View {
-    @Binding var text: String
-    let placeholder: String
-    let onSubmit: () async -> Void
-    @State private var isLoading = false
-    @Environment(\.colorScheme) var colorScheme
-    
-    var backgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.1) : .white
-    }
-    
-    var textColor: Color {
-        colorScheme == .dark ? .white : .black
-    }
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            TextField(placeholder, text: $text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 16))
-                .foregroundColor(textColor)
-                .padding(.horizontal, 16)
-                .submitLabel(.send)
-                .onSubmit {
-                    guard !text.isEmpty else { return }
-                    Task {
-                        isLoading = true
-                        await onSubmit()
-                        text = ""
-                        isLoading = false
-                    }
-                }
-            
-            if isLoading {
-                ProgressView()
-                    .padding(.trailing, 16)
-            } else if !text.isEmpty {
-                Button(action: {
-                    Task {
-                        isLoading = true
-                        await onSubmit()
-                        text = ""
-                        isLoading = false
-                    }
-                }) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .foregroundColor(.blue)
-                        .font(.system(size: 24))
-                }
-                .padding(.trailing, 12)
-            }
-        }
-        .frame(height: 50)
-        .background(backgroundColor)
-        .cornerRadius(25)
-    }
-}
-
 struct MainView: View {
-    @StateObject private var viewModel = TaskViewModel()
+    @EnvironmentObject var viewModel: TaskViewModel
     @State private var showingCreateTask = false
     @State private var isLoading = true
     @State private var hasError = false
-    @State private var taskCommand = ""
     @State private var selectedTab = 0
     @Environment(\.colorScheme) var colorScheme
     
@@ -197,7 +74,7 @@ struct MainView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
+            ZStack(alignment: .bottom) {
                 backgroundColor
                     .ignoresSafeArea()
                 
@@ -303,25 +180,27 @@ struct MainView: View {
                                     }
                                 }
                             }
-                            
-                            Spacer()
-                            
-                            // Input field at bottom
-                            TaskInputField(
-                                text: $taskCommand,
-                                placeholder: "Descreva sua tarefa...",
-                                onSubmit: {
-                                    do {
-                                        try await viewModel.createTaskFromNaturalLanguage(taskCommand)
-                                    } catch {
-                                        print("Error creating task: \(error)")
-                                    }
-                                }
-                            )
-                            .padding(.horizontal)
-                            .padding(.bottom)
                         }
                     }
+                }
+                
+                if viewModel.showingUndoToast {
+                    UndoToastView(
+                        message: "\"\(viewModel.lastCompletedTaskTitle)\" concluída",
+                        action: {
+                            do {
+                                try await viewModel.undoLastCompletion()
+                                withAnimation {
+                                    viewModel.showingUndoToast = false
+                                }
+                            } catch {
+                                print("Error undoing task completion: \(error)")
+                            }
+                        },
+                        isPresented: $viewModel.showingUndoToast
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.bottom, 16)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -337,12 +216,6 @@ struct MainView: View {
                             .foregroundColor(secondaryTextColor)
                     }
                 }
-                
-                ToolbarItem(placement: .automatic) {
-                    Text("Energia Mental")
-                        .foregroundColor(secondaryTextColor)
-                        .font(.subheadline)
-                }
             }
             .task {
                 do {
@@ -354,216 +227,24 @@ struct MainView: View {
                     hasError = true
                 }
             }
-        }
-    }
-}
-
-// Task row component
-struct TaskRow: View {
-    let task: TodoTask
-    let viewModel: TaskViewModel
-    let isOverdue: Bool
-    @Environment(\.colorScheme) var colorScheme
-    @State private var isCompleting = false
-    @State private var showingEditTask = false
-    
-    var cardBackgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.1) : .white
-    }
-    
-    var textColor: Color {
-        colorScheme == .dark ? .white : .black
-    }
-    
-    var secondaryTextColor: Color {
-        colorScheme == .dark ? .gray : .secondary
-    }
-    
-    var timeColor: Color {
-        isOverdue ? .red : .green
-    }
-    
-    var circleColor: Color {
-        switch task.priority.lowercased() {
-        case "high":
-            return Color(hex: "FF6B6B")
-        case "medium":
-            return Color(hex: "FFA94D")
-        case "low":
-            return Color(hex: "4D96FF")
-        default:
-            return secondaryTextColor
-        }
-    }
-    
-    private var formattedTime: String? {
-        // Only show time if it was explicitly set
-        guard task.hasTime,
-              let dueDateString = task.dueDate else {
-            return nil
-        }
-        
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        formatter.timeZone = TimeZone(identifier: "UTC")! // Ensure UTC parsing
-        
-        guard let utcDate = formatter.date(from: dueDateString) else {
-            return nil
-        }
-        
-        // Convert UTC to local time
-        let localDate = utcDate.addingTimeInterval(Double(TimeZone.current.secondsFromGMT()))
-        
-        // Format in local timezone
-        let timeFormatter = DateFormatter()
-        timeFormatter.timeStyle = .short
-        timeFormatter.dateStyle = .none
-        timeFormatter.timeZone = TimeZone.current // Local timezone for display
-        timeFormatter.locale = Locale.current // Ensure proper local formatting
-        
-        return timeFormatter.string(from: localDate)
-    }
-    
-    private var formattedDate: String? {
-        guard let dueDateString = task.dueDate else {
-            return nil
-        }
-        
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        formatter.timeZone = TimeZone(identifier: "UTC")! // Ensure UTC parsing
-        
-        guard let utcDate = formatter.date(from: dueDateString) else {
-            return nil
-        }
-        
-        let dateFormatter = DateFormatter()
-        dateFormatter.timeZone = TimeZone.current // Local timezone for display
-        dateFormatter.locale = Locale(identifier: "pt_BR")
-        dateFormatter.dateFormat = "d MMM"  // Direct format instead of template
-        
-        let fullDate = dateFormatter.string(from: utcDate)
-        // Convert month to uppercase and remove any "de" that might appear
-        return fullDate.replacingOccurrences(of: " de ", with: " ")
-            .replacingOccurrences(of: ". ", with: " ")
-            .replacingOccurrences(of: ".", with: "")
-            .replacingOccurrences(of: " ([a-zA-Z])", with: " $1".uppercased(), options: .regularExpression)
-    }
-    
-    var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    isCompleting = true
-                }
-            }) {
-                ZStack {
-                    Circle()
-                        .strokeBorder(circleColor, lineWidth: 1.5)
-                        .frame(width: 24, height: 20)
-                    
-                    if isCompleting {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(circleColor)
-                            .font(.system(size: 20))
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                }
-            }
-            .task(id: isCompleting) {
-                if isCompleting {
-                    do {
-                        try await Task.sleep(nanoseconds: 200_000_000)
-                        try await viewModel.completeTask(task)
-                    } catch {
-                        print("Error completing task: \(error)")
-                        isCompleting = false
-                    }
-                }
-            }
-            .padding(.top, 4)
-            .disabled(isCompleting)
-            
-            VStack(alignment: .leading, spacing: task.description == nil ? 0 : 4) {
-                Text(task.title)
-                    .foregroundColor(textColor)
-                    .opacity(isCompleting ? 0.5 : 1)
-                
-                if let description = task.description, !description.isEmpty {
-                    Text(description)
-                        .foregroundColor(secondaryTextColor)
-                        .font(.subheadline)
-                        .opacity(isCompleting ? 0.5 : 1)
-                }
-                
-                HStack(spacing: 8) {
-                    if isOverdue, let date = formattedDate {
-                        HStack(spacing: 4) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 12))
-                            Text(date)
-                                .font(.caption)
-                            if let time = formattedTime {
-                                Text(time)
-                                    .font(.caption)
+            .sheet(isPresented: $showingCreateTask) {
+                CreateTaskFormView(
+                    viewModel: viewModel,
+                    onTaskSaved: {
+                        Task {
+                            do {
+                                try await viewModel.loadAllTasks()
+                            } catch {
+                                print("Error refreshing tasks: \(error)")
                             }
                         }
-                        .padding(.vertical, 4)
-                        .foregroundColor(timeColor)
-                    } else if let time = formattedTime {
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .font(.system(size: 12))
-                            Text(time)
-                                .font(.caption)
-                        }
-                        .padding(.vertical, 4)
-                        .foregroundColor(timeColor)
                     }
-                    
-                    if task.project == nil {
-                        HStack(spacing: 4) {
-                            Image(systemName: "tray")
-                                .font(.system(size: 12))
-                            Text("Entrada")
-                                .font(.caption)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .foregroundColor(secondaryTextColor)
-                    } else if let project = task.project {
-                        Text(project.name)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(hex: project.color).opacity(0.2))
-                            .cornerRadius(4)
-                    }
-                }
-                .opacity(isCompleting ? 0.5 : 1)
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                .interactiveDismissDisabled(false)
             }
-            
-            Spacer()
-        }
-        .padding()
-        .background(cardBackgroundColor)
-        .cornerRadius(12)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            showingEditTask = true
-        }
-        .sheet(isPresented: $showingEditTask) {
-            TaskFormView(
-                task: task,
-                viewModel: viewModel,
-                onTaskSaved: {
-                    await viewModel.refreshTasks(forToday: true)
-                }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-            .presentationBackgroundInteraction(.enabled(upThrough: .medium))
-            .interactiveDismissDisabled(false)
         }
     }
 }
@@ -582,6 +263,14 @@ struct MainView_Previews: PreviewProvider {
                     Image(systemName: "filemenu.and.selection")
                     Text("Hoje")
                 }
+        }
+        .onAppear {
+            let tabBarAppearance = UITabBarAppearance()
+            tabBarAppearance.configureWithTransparentBackground()
+            tabBarAppearance.backgroundColor = .systemBackground.withAlphaComponent(0.8)
+            
+            UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
+            UITabBar.appearance().standardAppearance = tabBarAppearance
         }
     }
 } 

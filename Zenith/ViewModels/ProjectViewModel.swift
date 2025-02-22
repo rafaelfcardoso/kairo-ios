@@ -4,6 +4,8 @@ import Foundation
 class ProjectViewModel: ObservableObject {
     @Published private(set) var projects: [Project] = []
     private let baseURL = APIConfig.baseURL
+    private var lastFetchTime: Date?
+    private let cacheTimeout: TimeInterval = 120 // 2 minutes cache, same as TaskViewModel
     
     private func executeRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
         do {
@@ -66,19 +68,25 @@ class ProjectViewModel: ObservableObject {
         APIConfig.addAuthHeaders(to: &request)
         request.httpBody = jsonData
         
-        // Use the generic request executor
         let _: EmptyResponse = try await executeRequest(request)
         
-        // Refresh projects list after successful creation
+        invalidateCache() // Invalidate cache after creating new project
         try await loadProjects()
     }
     
     func loadProjects() async throws {
-        print("📂 [Projects] Loading projects...")
+        // Check if we have recent data
+        if let lastFetch = lastFetchTime,
+           Date().timeIntervalSince(lastFetch) < cacheTimeout,
+           !projects.isEmpty {
+            print("📂 [Projects] Using cached projects data")
+            return
+        }
+        
+        print("📂 [Projects] Loading projects from API...")
         let endpointURL = try APIConfig.getEndpointURL("/projects")
         var urlComponents = URLComponents(string: endpointURL)!
         
-        // Add includeSystem query parameter
         urlComponents.queryItems = [
             URLQueryItem(name: "includeSystem", value: "true")
         ]
@@ -95,6 +103,12 @@ class ProjectViewModel: ObservableObject {
         print("📂 [Projects] Loaded \(decodedProjects.count) projects")
         print("📂 [Projects] System projects: \(decodedProjects.filter { $0.isSystem }.count)")
         projects = decodedProjects
+        lastFetchTime = Date() // Update cache timestamp
+    }
+    
+    // Add cache invalidation method
+    func invalidateCache() {
+        lastFetchTime = nil
     }
     
     private struct EmptyResponse: Decodable {}

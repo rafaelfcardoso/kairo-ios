@@ -30,6 +30,11 @@ struct StatCard: View {
     let value: String
     let trend: Double
     let icon: String
+    @Environment(\.colorScheme) var colorScheme
+    
+    var cardBackgroundColor: Color {
+        colorScheme == .dark ? Color(UIColor.systemGray6) : .white
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -48,7 +53,7 @@ struct StatCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color(.systemBackground))
+        .background(cardBackgroundColor)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }

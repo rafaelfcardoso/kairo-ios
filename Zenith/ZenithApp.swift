@@ -14,7 +14,7 @@ import SwiftUI
     var colorScheme: ColorScheme = .light
     
     var backgroundColor: Color {
-        colorScheme == .dark ? .black : .white
+        colorScheme == .dark ? .black : Color(hex: "F1F2F4")
     }
     
     var activeColor: Color {
@@ -47,7 +47,7 @@ struct CustomTabBarStyle: ViewModifier {
         
         // Background configuration
         appearance.configureWithTransparentBackground()
-        appearance.backgroundColor = UIColor(colorScheme == .dark ? .black : Color(hex: "F1F2F4"))
+        appearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
         
         // Normal state
         let normalColor = UIColor(AppTheme.shared.inactiveColor)
@@ -59,6 +59,19 @@ struct CustomTabBarStyle: ViewModifier {
         appearance.stackedLayoutAppearance.selected.iconColor = selectedColor
         appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: selectedColor]
         
+        // Plus button (create tab) - always use the selected color
+        let createTabAppearance = UITabBarItemAppearance()
+        createTabAppearance.normal.iconColor = selectedColor
+        createTabAppearance.selected.iconColor = selectedColor
+        
+        // Apply the special appearance to the middle tab (index 2)
+        appearance.stackedLayoutAppearance.normal.iconColor = normalColor
+        appearance.stackedLayoutAppearance.selected.iconColor = selectedColor
+        
+        // Add transparent background for the middle tab
+        appearance.stackedLayoutAppearance.normal.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: 100) // Move title off screen
+        appearance.stackedLayoutAppearance.selected.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: 100)
+        
         // Apply appearance
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
@@ -69,12 +82,14 @@ struct CustomTabBarStyle: ViewModifier {
 enum Tab: Hashable {
     case dashboard
     case today
+    case create
     case blocks
     
     var title: String {
         switch self {
         case .dashboard: return "Dashboard"
         case .today: return "Hoje"
+        case .create: return ""  // Empty title for the plus button
         case .blocks: return "Blocks"
         }
     }
@@ -83,46 +98,96 @@ enum Tab: Hashable {
         switch self {
         case .dashboard: return "rectangle.stack.fill"
         case .today: return "filemenu.and.selection"
+        case .create: return "plus.circle.fill"
         case .blocks: return "rectangle.stack.badge.plus"
         }
+    }
+}
+
+// MARK: - Haptic Feedback
+class HapticManager {
+    static let shared = HapticManager()
+    
+    private init() {}
+    
+    func selectionChanged() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
     }
 }
 
 // MARK: - Main App
 @main
 struct ZenithApp: App {
+    @StateObject private var taskViewModel = TaskViewModel()
     @State private var selectedTab: Tab = .today
+    @State private var showingTaskInput = false
     @Environment(\.colorScheme) var colorScheme
     
     var body: some Scene {
         WindowGroup {
             TabView(selection: $selectedTab) {
                 DashboardView()
+                    .environmentObject(taskViewModel)
                     .tag(Tab.dashboard)
                     .tabItem {
                         Label(Tab.dashboard.title, systemImage: Tab.dashboard.icon)
-                            .environment(\.symbolVariants, selectedTab == .dashboard ? .fill : .none)
                     }
                 
                 MainView()
+                    .environmentObject(taskViewModel)
                     .tag(Tab.today)
                     .tabItem {
                         Label(Tab.today.title, systemImage: Tab.today.icon)
-                            .environment(\.symbolVariants, selectedTab == .today ? .fill : .none)
+                    }
+                
+                Color.clear
+                    .tag(Tab.create)
+                    .tabItem {
+                        Image(systemName: Tab.create.icon)
+                            .font(.system(size: 22, weight: .semibold))
                     }
                 
                 BlocksView()
                     .tag(Tab.blocks)
                     .tabItem {
                         Label(Tab.blocks.title, systemImage: Tab.blocks.icon)
-                            .environment(\.symbolVariants, selectedTab == .blocks ? .fill : .none)
                     }
+            }
+            .onChange(of: selectedTab) { oldTab, newTab in
+                if newTab == .create {
+                    showingTaskInput = true
+                    withAnimation(.none) {
+                        selectedTab = oldTab
+                    }
+                }
             }
             .onChange(of: colorScheme) { _, newValue in
                 AppTheme.shared.colorScheme = newValue
             }
             .modifier(CustomTabBarStyle())
             .tint(AppTheme.shared.activeColor)
+            .sheet(isPresented: $showingTaskInput) {
+                TaskInputView(
+                    onSubmit: { taskText in
+                        do {
+                            try await taskViewModel.createTaskFromNaturalLanguage(taskText)
+                        } catch {
+                            print("Error creating task: \(error)")
+                        }
+                    },
+                    onDismiss: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showingTaskInput = false
+                        }
+                    }
+                )
+                .presentationDetents([.height(80)])
+                .presentationDragIndicator(.hidden)
+                .presentationCornerRadius(16)
+                .presentationBackground(AppTheme.shared.backgroundColor)
+            }
         }
     }
 }
@@ -138,6 +203,12 @@ struct ZenithApp: App {
         MainView()
             .tabItem {
                 Label(Tab.today.title, systemImage: Tab.today.icon)
+            }
+        
+        Color.clear
+            .tabItem {
+                Image(systemName: Tab.create.icon)
+                    .font(.system(size: 22, weight: .semibold))
             }
         
         BlocksView()
@@ -158,6 +229,12 @@ struct ZenithApp: App {
         MainView()
             .tabItem {
                 Label(Tab.today.title, systemImage: Tab.today.icon)
+            }
+        
+        Color.clear
+            .tabItem {
+                Image(systemName: Tab.create.icon)
+                    .font(.system(size: 22, weight: .semibold))
             }
         
         BlocksView()

@@ -1,4 +1,5 @@
 import SwiftUI
+import _Concurrency
 
 struct TaskSectionView: View {
     let title: String
@@ -6,73 +7,40 @@ struct TaskSectionView: View {
     let secondaryTextColor: Color
     let cardBackgroundColor: Color
     let onTaskCreated: @Sendable () async -> Void
-    let viewModel: TaskViewModel
+    @StateObject var viewModel: TaskViewModel
     @Binding var showingCreateTask: Bool
-    @State private var shouldRefresh = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Section Title
+        VStack(alignment: .leading, spacing: 16) {
             Text(title)
-                .font(.headline)
-                .foregroundColor(secondaryTextColor)
+                .font(.title2)
+                .bold()
                 .padding(.horizontal)
+                .padding(.top)
             
-            // Tasks List
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(tasks) { task in
-                        TaskRow(
-                            task: task,
-                            viewModel: viewModel,
-                            isOverdue: title == "Atrasadas"
-                        )
-                    }
+            if tasks.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 40))
+                        .foregroundColor(secondaryTextColor)
                     
-                    if title == "Hoje" {
-                        Button(action: {
-                            showingCreateTask = true
-                        }) {
-                            HStack {
-                                Image(systemName: "plus")
-                                Text("Adicionar tarefa")
-                            }
-                            .foregroundColor(secondaryTextColor)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                            .background(cardBackgroundColor)
-                            .cornerRadius(12)
-                        }
-                        .accessibilityIdentifier("add-task-button")
-                        .sheet(isPresented: $showingCreateTask) {
-                            TaskFormView(
-                                viewModel: viewModel,
-                                onTaskSaved: {
-                                    await MainActor.run {
-                                        shouldRefresh = true
-                                    }
-                                    await onTaskCreated()
-                                    await MainActor.run {
-                                        shouldRefresh = false
-                                    }
-                                }
-                            )
-                            .presentationDetents([.medium, .large])
-                            .presentationDragIndicator(.visible)
-                            .presentationBackgroundInteraction(.enabled(upThrough: .medium))
-                            .interactiveDismissDisabled(false)
-                        }
-                    }
+                    Text("Nenhuma tarefa")
+                        .font(.headline)
+                        .foregroundColor(secondaryTextColor)
                 }
-                .padding(.horizontal)
-            }
-        }
-        .task(id: shouldRefresh) {
-            if shouldRefresh {
-                await onTaskCreated()
-                await MainActor.run {
-                    shouldRefresh = false
-                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 40)
+            } else {
+                TaskListView(
+                    showingCreateTask: $showingCreateTask,
+                    tasks: tasks,
+                    secondaryTextColor: secondaryTextColor,
+                    cardBackgroundColor: cardBackgroundColor,
+                    onTaskCreated: { @Sendable in
+                        await onTaskCreated()
+                    },
+                    viewModel: viewModel
+                )
             }
         }
     }
