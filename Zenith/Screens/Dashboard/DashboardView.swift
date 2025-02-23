@@ -31,7 +31,8 @@ struct DashboardErrorView: View {
 }
 
 struct DashboardView: View {
-    @StateObject private var viewModel = ProjectViewModel()
+    @StateObject private var projectViewModel = ProjectViewModel()
+    @EnvironmentObject var taskViewModel: TaskViewModel
     @Environment(\.colorScheme) var colorScheme
     @State private var showingCreateProject = false
     @State private var isLoading = true
@@ -73,7 +74,7 @@ struct DashboardView: View {
                     ScrollView {
                         VStack(spacing: 16) {
                             // Inbox Card
-                            if let inboxProject = viewModel.projects.first(where: { $0.isSystem }) {
+                            if let inboxProject = projectViewModel.projects.first(where: { $0.isSystem }) {
                                 NavigationLink(destination: InboxView()) {
                                     HStack {
                                         Image(systemName: "tray")
@@ -137,7 +138,7 @@ struct DashboardView: View {
                                         )
                                     } else {
                                         // Projects List (excluding Inbox)
-                                        ForEach(viewModel.projects.filter { !$0.isSystem }) { project in
+                                        ForEach(projectViewModel.projects.filter { !$0.isSystem }) { project in
                                             projectRow(project: project)
                                         }
                                     }
@@ -154,7 +155,7 @@ struct DashboardView: View {
                 await loadProjects()
             }
             .sheet(isPresented: $showingCreateProject) {
-                CreateProjectView(viewModel: viewModel)
+                CreateProjectView(viewModel: projectViewModel)
                     .presentationDetents([.medium])
                     .presentationDragIndicator(.visible)
             }
@@ -166,7 +167,7 @@ struct DashboardView: View {
         hasError = false
         
         do {
-            try await viewModel.loadProjects()
+            try await projectViewModel.loadProjects()
             isLoading = false
         } catch {
             isLoading = false

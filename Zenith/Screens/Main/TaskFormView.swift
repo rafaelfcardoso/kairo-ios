@@ -58,9 +58,9 @@ struct DateSelectionView: View {
         let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
         print("Debug: Applying time components - Hour: \(timeComponents.hour ?? 0), Minute: \(timeComponents.minute ?? 0)")
         return calendar.date(bySettingHour: timeComponents.hour ?? 0,
-                            minute: timeComponents.minute ?? 0,
-                            second: 0,
-                            of: date) ?? date
+                           minute: timeComponents.minute ?? 0,
+                           second: 0,
+                           of: date) ?? date
     }
     
     private func handleDismiss() {
@@ -360,82 +360,127 @@ struct TaskFormView: View {
         selectedPriority?.color ?? secondaryTextColor
     }
     
-    private func saveTask() async {
+    private func applyTimeToDate(_ date: Date) -> Date {
+        guard let time = selectedTime else { return date }
+        let calendar = Calendar.current
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
+        print("Debug: Applying time components - Hour: \(timeComponents.hour ?? 0), Minute: \(timeComponents.minute ?? 0)")
+        return calendar.date(bySettingHour: timeComponents.hour ?? 0,
+                           minute: timeComponents.minute ?? 0,
+                           second: 0,
+                           of: date) ?? date
+    }
+    
+    private enum UpdateField {
+        case title
+        case description
+        case priority
+        case project
+        case dueDate
+        case all
+    }
+
+    private func saveTask(field: UpdateField = .all) async {
         guard !taskTitle.isEmpty else { return }
         
         isLoading = true
         defer { isLoading = false }
         
-        print("🕒 [Timezone] Starting saveTask")
-        print("🕒 [Timezone] Current timezone: \(TimeZone.current.identifier) (GMT\(TimeZone.current.secondsFromGMT()/3600 >= 0 ? "+" : "")\(TimeZone.current.secondsFromGMT()/3600))")
+        print("🕒 [Timezone] Starting saveTask for field: \(field)")
         
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)! // Ensure UTC output
+        // Prepare the task data based on which field is being updated
+        var taskData: [String: Any] = [:]
         
-        var calendar = Calendar.current
-        calendar.timeZone = TimeZone.current // Use local timezone for date components
-        
-        // Prepare the due date string and hasTime flag
-        let dueDateString: String?
-        let hasTime: Bool
-        
-        if let selectedDate = selectedDate {
-            print("🕒 [Timezone] Selected date in local time: \(selectedDate)")
+        switch field {
+        case .title:
+            taskData["title"] = taskTitle
+        case .description:
+            taskData["description"] = taskDescription
+        case .priority:
+            taskData["priority"] = selectedPriority?.rawValue ?? "none"
+        case .project:
+            taskData["projectId"] = selectedProject?.id ?? inboxProjectId
+        case .dueDate:
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)!
             
-            let dueDate: Date
-            if let selectedTime = selectedTime {
-                print("🕒 [Timezone] Selected time in local time: \(selectedTime)")
+            var calendar = Calendar.current
+            calendar.timeZone = TimeZone.current
+            
+            if let selectedDate = selectedDate {
+                let dueDate: Date
+                if let selectedTime = selectedTime {
+                    let timeComponents = calendar.dateComponents([.hour, .minute], from: selectedTime)
+                    dueDate = calendar.date(
+                        bySettingHour: timeComponents.hour ?? 0,
+                        minute: timeComponents.minute ?? 0,
+                        second: 0,
+                        of: selectedDate
+                    ) ?? selectedDate
+                    taskData["hasTime"] = true
+                } else {
+                    dueDate = calendar.startOfDay(for: selectedDate)
+                    taskData["hasTime"] = false
+                }
                 
-                // Combine the selected date with the selected time
-                let timeComponents = calendar.dateComponents([.hour, .minute], from: selectedTime)
-                print("🕒 [Timezone] Time components (local): Hour: \(timeComponents.hour ?? 0), Minute: \(timeComponents.minute ?? 0)")
-                
-                dueDate = calendar.date(
-                    bySettingHour: timeComponents.hour ?? 0,
-                    minute: timeComponents.minute ?? 0,
-                    second: 0,
-                    of: selectedDate
-                ) ?? selectedDate
-                
-                hasTime = true
+                let utcDate = dueDate.addingTimeInterval(Double(-TimeZone.current.secondsFromGMT()))
+                taskData["dueDate"] = dateFormatter.string(from: utcDate)
             } else {
-                dueDate = calendar.startOfDay(for: selectedDate)
-                hasTime = false
+                taskData["dueDate"] = nil
+                taskData["hasTime"] = false
+            }
+        case .all:
+            // Only used for creating new tasks
+            guard existingTask == nil else {
+                print("Warning: Attempted to update all fields for existing task")
+                return
             }
             
-            // Convert local time to UTC for API
-            let utcDate = dueDate.addingTimeInterval(Double(-TimeZone.current.secondsFromGMT()))
-            dueDateString = dateFormatter.string(from: utcDate)
-            print("🕒 [Timezone] Converted to UTC for API: \(dueDateString ?? "nil")")
-        } else {
-            dueDateString = nil
-            hasTime = false
+            taskData = [
+                "title": taskTitle,
+                "description": taskDescription,
+                "priority": selectedPriority?.rawValue ?? "none",
+                "projectId": selectedProject?.id ?? inboxProjectId
+            ]
+            
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)!
+            
+            if let selectedDate = selectedDate {
+                var calendar = Calendar.current
+                calendar.timeZone = TimeZone.current
+                
+                let dueDate: Date
+                if let selectedTime = selectedTime {
+                    let timeComponents = calendar.dateComponents([.hour, .minute], from: selectedTime)
+                    dueDate = calendar.date(
+                        bySettingHour: timeComponents.hour ?? 0,
+                        minute: timeComponents.minute ?? 0,
+                        second: 0,
+                        of: selectedDate
+                    ) ?? selectedDate
+                    taskData["hasTime"] = true
+                } else {
+                    dueDate = calendar.startOfDay(for: selectedDate)
+                    taskData["hasTime"] = false
+                }
+                
+                let utcDate = dueDate.addingTimeInterval(Double(-TimeZone.current.secondsFromGMT()))
+                taskData["dueDate"] = dateFormatter.string(from: utcDate)
+            }
         }
-        
-        let taskData: [String: Any] = [
-            "title": taskTitle,
-            "description": taskDescription,
-            "priority": selectedPriority?.rawValue ?? "none",
-            "projectId": selectedProject?.id ?? inboxProjectId
-        ].merging([
-            "dueDate": dueDateString as Any,
-            "hasTime": hasTime
-        ]) { (_, new) in new }
-        
-        print("🌐 [API] Task data: \(taskData)")
         
         do {
             let url: URL
             var request: URLRequest
             
             if let existingTask = existingTask {
-                // Update existing task
                 url = URL(string: "\(APIConfig.baseURL)\(APIConfig.apiPath)/tasks/\(existingTask.id)")!
                 request = URLRequest(url: url)
                 request.httpMethod = "PUT"
             } else {
-                // Create new task
                 url = URL(string: "\(APIConfig.baseURL)\(APIConfig.apiPath)/tasks")!
                 request = URLRequest(url: url)
                 request.httpMethod = "POST"
@@ -448,46 +493,41 @@ struct TaskFormView: View {
             let jsonData = try JSONSerialization.data(withJSONObject: taskData)
             request.httpBody = jsonData
             
-            print("🌐 [API] Request URL: \(url)")
-            print("🌐 [API] Request Method: \(request.httpMethod ?? "Unknown")")
-            print("🌐 [API] Request Headers: \(request.allHTTPHeaderFields ?? [:])")
-            if let bodyString = String(data: jsonData, encoding: .utf8) {
-                print("🌐 [API] Request Body: \(bodyString)")
-            }
-            
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await URLSession.shared.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw URLError(.badServerResponse)
-            }
-            
-            print("🌐 [API] Response Status Code: \(httpResponse.statusCode)")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("🌐 [API] Response Body: \(responseString)")
             }
             
             guard (200...299).contains(httpResponse.statusCode) else {
                 throw URLError(.badServerResponse)
             }
             
-            // Decode the response to get the updated task
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("🌐 [API] Response Body: \(responseString)")
-            }
-            
-            // First call onTaskSaved to refresh the task lists
-            await onTaskSaved()
-            
-            // Only dismiss if this is a new task creation
-            if existingTask == nil {
-                await MainActor.run {
-                    dismiss()
+            // Immediately update the task lists after any change
+            await MainActor.run {
+                // First invalidate all caches
+                viewModel.invalidateCache()
+                
+                Task {
+                    do {
+                        // Then force a fresh reload of all tasks
+                        try await viewModel.loadAllTasks()
+                        // Finally notify any listeners that a task was saved
+                        await onTaskSaved()
+                    } catch {
+                        print("Error refreshing tasks: \(error)")
+                    }
                 }
             }
+            
         } catch {
             print("Network error: \(error)")
             self.error = error
         }
+    }
+    
+    private func handleDismiss() {
+        dismiss()
     }
     
     var body: some View {
@@ -510,7 +550,7 @@ struct TaskFormView: View {
                             .onSubmit {
                                 if taskTitle.isEmpty { return }
                                 Task {
-                                    await saveTask()
+                                    await saveTask(field: .title)
                                 }
                             }
                     }
@@ -533,7 +573,7 @@ struct TaskFormView: View {
                                 .onSubmit {
                                     if taskTitle.isEmpty { return }
                                     Task {
-                                        await saveTask()
+                                        await saveTask(field: .description)
                                     }
                                 }
                         }
@@ -551,7 +591,7 @@ struct TaskFormView: View {
                                         selectedProject = inbox
                                         if existingTask != nil {
                                             Task {
-                                                await saveTask()
+                                                await saveTask(field: .project)
                                             }
                                         }
                                     } label: {
@@ -577,7 +617,7 @@ struct TaskFormView: View {
                                         selectedProject = project
                                         if existingTask != nil {
                                             Task {
-                                                await saveTask()
+                                                await saveTask(field: .project)
                                             }
                                         }
                                     } label: {
@@ -634,11 +674,7 @@ struct TaskFormView: View {
                                     onDismiss: {
                                         if existingTask != nil {
                                             Task {
-                                                isLoading = true
-                                                await saveTask()
-                                                // Ensure we refresh both task lists
-                                                try? await viewModel.loadAllTasks()
-                                                isLoading = false
+                                                await saveTask(field: .dueDate)
                                             }
                                         }
                                     }
@@ -652,7 +688,7 @@ struct TaskFormView: View {
                                         selectedPriority = priority
                                         if existingTask != nil {
                                             Task {
-                                                await saveTask()
+                                                await saveTask(field: .priority)
                                             }
                                         }
                                     } label: {
@@ -680,7 +716,7 @@ struct TaskFormView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancelar") {
-                        dismiss()
+                        handleDismiss()
                     }
                     .foregroundColor(textColor)
                     .disabled(isLoading)
@@ -690,7 +726,8 @@ struct TaskFormView: View {
                     if existingTask == nil {
                         Button("Concluir") {
                             Task {
-                                await saveTask()
+                                await saveTask(field: .all)
+                                dismiss()
                             }
                         }
                         .bold()

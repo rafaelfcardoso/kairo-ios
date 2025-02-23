@@ -1,20 +1,25 @@
 import Foundation
 import AVFoundation
 import UIKit
+import AudioToolbox
 
 @MainActor
 class TaskViewModel: ObservableObject {
-    @Published private(set) var tasks: [TodoTask] = []
+    @Published var tasks: [TodoTask] = []
     @Published private(set) var overdueTasks: [TodoTask] = []
     @Published private(set) var isLoading = false
     @Published private(set) var greeting: String = ""
     @Published private(set) var formattedDate: String = ""
+    @Published var showingUndoToast = false
+    @Published var lastCompletedTaskTitle: String = ""
     private let baseURL = APIConfig.baseURL
-    private var audioPlayer: AVAudioPlayer?
     private var currentTask: Task<Void, Error>? // This is a Swift concurrency task
+    private var lastFetchTime: Date?
+    private let cacheTimeout: TimeInterval = 120 // 120 seconds cache
+    private var lastOverdueFetchTime: Date?  // Add this for overdue tasks cache
+    private var lastCompletedTask: TodoTask? // Store the last completed task for undo
     
     init() {
-        prepareCompletionSound()
         updateDateTime()
         
         // Observe when app becomes active
@@ -53,19 +58,6 @@ class TaskViewModel: ObservableObject {
         formattedDate = dateFormatter.string(from: date)
     }
     
-    private func prepareCompletionSound() {
-        guard let soundURL = Bundle.main.url(forResource: "completion", withExtension: "mp3") else {
-            return
-        }
-        
-        do {
-            audioPlayer = try AVAudioPlayer(contentsOf: soundURL)
-            audioPlayer?.prepareToPlay()
-        } catch {
-            print("Could not create audio player: \(error)")
-        }
-    }
-    
     private func executeRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -100,6 +92,15 @@ class TaskViewModel: ObservableObject {
     }
     
     func loadTasks(projectId: String? = nil, isRefreshing: Bool = false, forToday: Bool = false) async throws {
+        // Check if we have recent data
+        if let lastFetch = lastFetchTime, 
+           Date().timeIntervalSince(lastFetch) < cacheTimeout,
+           !tasks.isEmpty {
+            print("Using cached tasks data")
+            return // Use cached data
+        }
+        
+        print("Fetching new tasks data")
         // Cancel any ongoing network request
         currentTask?.cancel()
         
@@ -148,6 +149,8 @@ class TaskViewModel: ObservableObject {
             } else {
                 tasks = decodedTasks
             }
+            
+            lastFetchTime = Date()
         }
         
         try await currentTask?.value
@@ -173,11 +176,56 @@ class TaskViewModel: ObservableObject {
         let _: EmptyResponse = try await executeRequest(request)
         
         let taskId = task.id
-        // Play completion sound
-        audioPlayer?.play()
         
-        // Remove the task from the list
+        // Store the task before removing it for potential undo
+        lastCompletedTask = task
+        lastCompletedTaskTitle = task.title
+        
+        // Play system sound
+        AudioServicesPlaySystemSound(1004) // This is the "Tweet" sound
+        
         tasks.removeAll { $0.id == taskId }
+        overdueTasks.removeAll { $0.id == taskId }
+        
+        // Show the undo toast
+        await MainActor.run {
+            showingUndoToast = true
+        }
+        
+        // Invalidate cache to ensure lists are updated
+        invalidateCache()
+    }
+    
+    func undoLastCompletion() async throws {
+        guard let task = lastCompletedTask else { return }
+        
+        let endpointURL = try APIConfig.getEndpointURL("/tasks/\(task.id)/status")
+        guard let url = URL(string: endpointURL) else {
+            throw APIError.invalidURL(endpointURL)
+        }
+        
+        let body = ["status": "not_started"]
+        let jsonData = try JSONSerialization.data(withJSONObject: body)
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        APIConfig.addAuthHeaders(to: &request)
+        request.httpBody = jsonData
+        
+        // Use the generic request executor
+        let _: EmptyResponse = try await executeRequest(request)
+        
+        // Clear the stored task
+        lastCompletedTask = nil
+        
+        // Add a small delay to prevent immediate re-completion
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // Refresh the task lists
+        invalidateCache()
+        try await loadAllTasks()
     }
     
     // Add this struct for empty responses
@@ -185,9 +233,9 @@ class TaskViewModel: ObservableObject {
     
     // Natural language task creation
     func createTaskFromNaturalLanguage(_ command: String) async throws {
-        let endpointURL = "http://localhost:8000/api/v1/tasks/natural-language"
-        guard let url = URL(string: endpointURL) else {
-            throw APIError.invalidURL(endpointURL)
+        let endpoint = "\(APIConfig.aiServiceURL)\(APIConfig.apiPath)/tasks/natural-language"
+        guard let url = URL(string: endpoint) else {
+            throw APIError.invalidURL(endpoint)
         }
         
         // Get timezone information
@@ -206,6 +254,7 @@ class TaskViewModel: ObservableObject {
         ]
         
         print("🕒 [NLP] Using timezone context: \(userContext)")
+        print("🌐 [AI] Sending request to: \(endpoint)")
         
         let body: [String: Any] = [
             "command": command,
@@ -221,11 +270,32 @@ class TaskViewModel: ObservableObject {
         APIConfig.addAuthHeaders(to: &request)
         request.httpBody = jsonData
         
-        // Use the generic request executor
-        let _: EmptyResponse = try await executeRequest(request)
-        
-        // Refresh tasks after creation
-        try await loadTasks(forToday: true)
+        do {
+            let _: EmptyResponse = try await executeRequest(request)
+            invalidateCache() // Invalidate after creating new task
+            try await loadTasks(forToday: true)
+        } catch let error as NSError {
+            print("❌ [AI] Error creating task: \(error.localizedDescription)")
+            print("❌ [AI] Error details: \(error)")
+            
+            // Provide more specific error message for connection issues
+            if error.domain == NSURLErrorDomain {
+                switch error.code {
+                case NSURLErrorCannotConnectToHost, NSURLErrorNotConnectedToInternet:
+                    throw APIError.networkError(NSError(
+                        domain: error.domain,
+                        code: error.code,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: "Could not connect to the AI service. Please check your internet connection and try again."
+                        ]
+                    ))
+                default:
+                    throw APIError.networkError(error)
+                }
+            } else {
+                throw APIError.networkError(error)
+            }
+        }
     }
     
     // Call this for initial fetch
@@ -251,6 +321,15 @@ class TaskViewModel: ObservableObject {
     }
     
     func loadOverdueTasks() async throws {
+        // Add caching check
+        if let lastFetch = lastOverdueFetchTime, 
+           Date().timeIntervalSince(lastFetch) < cacheTimeout,
+           !overdueTasks.isEmpty {
+            print("Using cached overdue tasks data")
+            return
+        }
+        
+        print("Fetching new overdue tasks data")
         let endpointURL = try APIConfig.getEndpointURL("/tasks/views/overdue")
         let urlComponents = URLComponents(string: endpointURL)!
         
@@ -263,23 +342,45 @@ class TaskViewModel: ObservableObject {
         APIConfig.addAuthHeaders(to: &request)
         
         overdueTasks = try await executeRequest(request)
+        lastOverdueFetchTime = Date()  // Update cache timestamp
     }
     
     func loadAllTasks() async throws {
+        // Check if both caches are valid
+        if let lastTasksFetch = lastFetchTime,
+           let lastOverdueFetch = lastOverdueFetchTime,
+           Date().timeIntervalSince(lastTasksFetch) < cacheTimeout,
+           Date().timeIntervalSince(lastOverdueFetch) < cacheTimeout,
+           !tasks.isEmpty || !overdueTasks.isEmpty {
+            print("Using cached all tasks data")
+            return
+        }
+        
+        print("Fetching all new tasks data")
+        // First invalidate caches on main actor
+        await MainActor.run {
+            lastOverdueFetchTime = nil
+            lastFetchTime = nil
+        }
+        
         // Load both task types concurrently
         try await withThrowingTaskGroup(of: Void.self) { group in
-            // Add overdue tasks loading
             group.addTask {
                 try await self.loadOverdueTasks()
             }
             
-            // Add today's tasks loading
             group.addTask {
                 try await self.loadTasks(forToday: true)
             }
             
-            // Wait for all tasks to complete
             try await group.waitForAll()
         }
+    }
+    
+    // Add a method to invalidate cache when needed
+    func invalidateCache() {
+        print("Invalidating task caches")
+        lastFetchTime = nil
+        lastOverdueFetchTime = nil
     }
 } 
