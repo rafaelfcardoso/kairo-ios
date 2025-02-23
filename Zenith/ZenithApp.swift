@@ -7,88 +7,240 @@
 
 import SwiftUI
 
-@main
-struct ZenithApp: App {
-    @Environment(\.colorScheme) var colorScheme
-    @State private var selectedTab: Tab = .today
+// MARK: - Theme
+@Observable final class AppTheme {
+    static let shared = AppTheme()
     
-    enum Tab {
-        case dashboard
-        case today
-    }
+    var colorScheme: ColorScheme = .light
     
     var backgroundColor: Color {
         colorScheme == .dark ? .black : Color(hex: "F1F2F4")
     }
     
     var activeColor: Color {
-        colorScheme == .dark ? Color(hex: "F1F2F4") : .black
+        colorScheme == .dark ? .white : .black
     }
     
     var inactiveColor: Color {
         Color(hex: "7E7E7E")
     }
     
+    private init() {}
+}
+
+// MARK: - Tab Bar Style
+struct CustomTabBarStyle: ViewModifier {
+    @Environment(\.colorScheme) var colorScheme
+    
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                updateTabBarAppearance()
+            }
+            .onChange(of: colorScheme) { _, _ in
+                updateTabBarAppearance()
+            }
+    }
+    
+    private func updateTabBarAppearance() {
+        let appearance = UITabBarAppearance()
+        
+        // Background configuration
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
+        
+        // Normal state
+        let normalColor = UIColor(AppTheme.shared.inactiveColor)
+        appearance.stackedLayoutAppearance.normal.iconColor = normalColor
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: normalColor]
+        
+        // Selected state
+        let selectedColor = colorScheme == .dark ? UIColor.white : UIColor.black
+        appearance.stackedLayoutAppearance.selected.iconColor = selectedColor
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: selectedColor]
+        
+        // Plus button (create tab) - always use the selected color
+        let createTabAppearance = UITabBarItemAppearance()
+        createTabAppearance.normal.iconColor = selectedColor
+        createTabAppearance.selected.iconColor = selectedColor
+        
+        // Apply the special appearance to the middle tab (index 2)
+        appearance.stackedLayoutAppearance.normal.iconColor = normalColor
+        appearance.stackedLayoutAppearance.selected.iconColor = selectedColor
+        
+        // Add transparent background for the middle tab
+        appearance.stackedLayoutAppearance.normal.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: 100) // Move title off screen
+        appearance.stackedLayoutAppearance.selected.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: 100)
+        
+        // Apply appearance
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+}
+
+// MARK: - Main Navigation
+enum Tab: Hashable {
+    case dashboard
+    case today
+    case create
+    case blocks
+    
+    var title: String {
+        switch self {
+        case .dashboard: return "Dashboard"
+        case .today: return "Hoje"
+        case .create: return ""  // Empty title for the plus button
+        case .blocks: return "Blocks"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .dashboard: return "rectangle.stack.fill"
+        case .today: return "filemenu.and.selection"
+        case .create: return "plus.circle.fill"
+        case .blocks: return "rectangle.stack.badge.plus"
+        }
+    }
+}
+
+// MARK: - Haptic Feedback
+class HapticManager {
+    static let shared = HapticManager()
+    
+    private init() {}
+    
+    func selectionChanged() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+    }
+}
+
+// MARK: - Main App
+@main
+struct ZenithApp: App {
+    @StateObject private var taskViewModel = TaskViewModel()
+    @State private var selectedTab: Tab = .today
+    @State private var showingTaskInput = false
+    @Environment(\.colorScheme) var colorScheme
+    
     var body: some Scene {
         WindowGroup {
             TabView(selection: $selectedTab) {
                 DashboardView()
-                    .tabItem {
-                        Label("Dashboard", systemImage: "rectangle.stack.fill")
-                            .environment(\.symbolVariants, selectedTab == .dashboard ? .fill : .none)
-                    }
+                    .environmentObject(taskViewModel)
                     .tag(Tab.dashboard)
+                    .tabItem {
+                        Label(Tab.dashboard.title, systemImage: Tab.dashboard.icon)
+                    }
                 
                 MainView()
-                    .tabItem {
-                        Label("Hoje", systemImage: "filemenu.and.selection")
-                            .environment(\.symbolVariants, selectedTab == .today ? .fill : .none)
-                    }
+                    .environmentObject(taskViewModel)
                     .tag(Tab.today)
+                    .tabItem {
+                        Label(Tab.today.title, systemImage: Tab.today.icon)
+                    }
+                
+                Color.clear
+                    .tag(Tab.create)
+                    .tabItem {
+                        Image(systemName: Tab.create.icon)
+                            .font(.system(size: 22, weight: .semibold))
+                    }
+                
+                BlocksView()
+                    .tag(Tab.blocks)
+                    .tabItem {
+                        Label(Tab.blocks.title, systemImage: Tab.blocks.icon)
+                    }
             }
-            .tint(activeColor)
-            .background(backgroundColor)
-            .onAppear {
-                // Customize unselected tab item color
-                let unselectedColor = UIColor(red: 126/255, green: 126/255, blue: 126/255, alpha: 1)
-                UITabBar.appearance().unselectedItemTintColor = unselectedColor
+            .onChange(of: selectedTab) { oldTab, newTab in
+                if newTab == .create {
+                    showingTaskInput = true
+                    withAnimation(.none) {
+                        selectedTab = oldTab
+                    }
+                }
+            }
+            .onChange(of: colorScheme) { _, newValue in
+                AppTheme.shared.colorScheme = newValue
+            }
+            .modifier(CustomTabBarStyle())
+            .tint(AppTheme.shared.activeColor)
+            .sheet(isPresented: $showingTaskInput) {
+                TaskInputView(
+                    onSubmit: { taskText in
+                        do {
+                            try await taskViewModel.createTaskFromNaturalLanguage(taskText)
+                        } catch {
+                            print("Error creating task: \(error)")
+                        }
+                    },
+                    onDismiss: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showingTaskInput = false
+                        }
+                    }
+                )
+                .presentationDetents([.height(80)])
+                .presentationDragIndicator(.hidden)
+                .presentationCornerRadius(16)
+                .presentationBackground(AppTheme.shared.backgroundColor)
             }
         }
     }
 }
 
-struct ZenithApp_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            TabView {
-                DashboardView()
-                    .tabItem {
-                        Label("Dashboard", systemImage: "rectangle.stack.fill")
-                    }
-                
-                MainView()
-                    .tabItem {
-                        Label("Hoje", systemImage: "filemenu.and.selection")
-                    }
+// MARK: - Preview Provider
+#Preview("Light Mode") {
+    TabView {
+        DashboardView()
+            .tabItem {
+                Label(Tab.dashboard.title, systemImage: Tab.dashboard.icon)
             }
-            .accentColor(.white)
-            .preferredColorScheme(.dark)
-            .previewDisplayName("Dark Mode")
-            
-            TabView {
-                DashboardView()
-                    .tabItem {
-                        Label("Dashboard", systemImage: "rectangle.stack.fill")
-                    }
-                
-                MainView()
-                    .tabItem {
-                        Label("Hoje", systemImage: "filemenu.and.selection")
-                    }
+        
+        MainView()
+            .tabItem {
+                Label(Tab.today.title, systemImage: Tab.today.icon)
             }
-            .accentColor(.black)
-            .preferredColorScheme(.light)
-            .previewDisplayName("Light Mode")
-        }
+        
+        Color.clear
+            .tabItem {
+                Image(systemName: Tab.create.icon)
+                    .font(.system(size: 22, weight: .semibold))
+            }
+        
+        BlocksView()
+            .tabItem {
+                Label(Tab.blocks.title, systemImage: Tab.blocks.icon)
+            }
     }
+    .preferredColorScheme(.light)
+}
+
+#Preview("Dark Mode") {
+    TabView {
+        DashboardView()
+            .tabItem {
+                Label(Tab.dashboard.title, systemImage: Tab.dashboard.icon)
+            }
+        
+        MainView()
+            .tabItem {
+                Label(Tab.today.title, systemImage: Tab.today.icon)
+            }
+        
+        Color.clear
+            .tabItem {
+                Image(systemName: Tab.create.icon)
+                    .font(.system(size: 22, weight: .semibold))
+            }
+        
+        BlocksView()
+            .tabItem {
+                Label(Tab.blocks.title, systemImage: Tab.blocks.icon)
+            }
+    }
+    .preferredColorScheme(.dark)
 }

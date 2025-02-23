@@ -30,6 +30,7 @@ enum APIConfig {
     #if DEBUG
     static var isTestEnvironment = false
     static var testBaseURL: String?
+    static var testAIServiceURL: String?
     #endif
     
     static var baseURL: String {
@@ -39,6 +40,15 @@ enum APIConfig {
         }
         #endif
         return "https://zenith-api-development.up.railway.app"
+    }
+    
+    static var aiServiceURL: String {
+        #if DEBUG
+        if isTestEnvironment, let testURL = testAIServiceURL {
+            return testURL
+        }
+        #endif
+        return "https://zenith-ai-development.up.railway.app"
     }
     
     static let apiPath = "/api/v1"
@@ -173,8 +183,8 @@ enum APIConfig {
     }
     
     static func handleAPIResponse(_ data: Data, _ response: HTTPURLResponse) throws {
-        logDebug("Response Status: \(response.statusCode) for URL: \(response.url?.absoluteString ?? "unknown")")
-        logResponseBody(data)
+        // logDebug("Response Status: \(response.statusCode) for URL: \(response.url?.absoluteString ?? "unknown")")
+        // logResponseBody(data)
         
         guard (200...299).contains(response.statusCode) else {
             switch response.statusCode {
