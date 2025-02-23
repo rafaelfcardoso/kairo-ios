@@ -116,16 +116,24 @@ struct TaskRow: View {
                         try await viewModel.completeTask(task)
                     } catch {
                         print("Error completing task: \(error)")
-                        withAnimation {
-                            isCompleting = false
+                        await MainActor.run {
+                            withAnimation {
+                                isCompleting = false
+                            }
                         }
                     }
                 }
             }
-            .onChange(of: task.id) { _ in
-                // Reset completing state when task changes (e.g., after undo)
-                withAnimation {
-                    isCompleting = false
+            .onAppear {
+                // Ensure the completing state is reset when the view appears
+                isCompleting = false
+            }
+            .onChange(of: task.id, initial: true) { oldId, newId in
+                // Reset completing state when task changes or when view initializes
+                if oldId != newId {
+                    withAnimation {
+                        isCompleting = false
+                    }
                 }
             }
             .padding(.top, 4)
