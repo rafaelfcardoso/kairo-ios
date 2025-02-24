@@ -43,6 +43,7 @@ struct ErrorView: View {
 struct MainView: View {
     @EnvironmentObject var viewModel: TaskViewModel
     @State private var showingCreateTask = false
+    @State private var showingFocusSession = false
     @State private var isLoading = true
     @State private var hasError = false
     @State private var selectedTab = 0
@@ -73,7 +74,7 @@ struct MainView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack(alignment: .bottom) {
                 backgroundColor
                     .ignoresSafeArea()
@@ -180,6 +181,25 @@ struct MainView: View {
                                     }
                                 }
                             }
+                            
+                            // Start Focus Button
+                            Button {
+                                showingFocusSession = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "timer")
+                                        .font(.headline)
+                                    Text("Iniciar Foco")
+                                        .font(.headline)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(Color.blue)
+                                .cornerRadius(12)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
                         }
                     }
                 }
@@ -216,6 +236,10 @@ struct MainView: View {
                             .foregroundColor(secondaryTextColor)
                     }
                 }
+            }
+            .fullScreenCover(isPresented: $showingFocusSession) {
+                FocusSessionView()
+                    .environmentObject(viewModel)
             }
             .task {
                 do {

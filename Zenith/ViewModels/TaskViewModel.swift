@@ -12,6 +12,8 @@ class TaskViewModel: ObservableObject {
     @Published private(set) var formattedDate: String = ""
     @Published var showingUndoToast = false
     @Published var lastCompletedTaskTitle: String = ""
+    @Published var timeWorkedToday: TimeInterval = 0
+    @Published var focusSessionHistory: [(date: Date, duration: TimeInterval)] = []
     private let baseURL = APIConfig.baseURL
     private var currentTask: Task<Void, Error>? // This is a Swift concurrency task
     private var lastFetchTime: Date?
@@ -382,5 +384,11 @@ class TaskViewModel: ObservableObject {
         print("Invalidating task caches")
         lastFetchTime = nil
         lastOverdueFetchTime = nil
+    }
+    
+    func updateTimeWorkedToday(_ duration: TimeInterval) {
+        timeWorkedToday += duration
+        focusSessionHistory.append((date: Date(), duration: duration))
+        // Persist to storage
     }
 } 
