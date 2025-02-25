@@ -56,18 +56,18 @@ struct MinimizedFocusSession: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.vertical, 16)
                 
                 // Progress bar
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         Rectangle()
                             .fill(Color(UIColor.systemGray5))
-                            .frame(height: 2)
+                            .frame(height: 3)
                         
                         Rectangle()
                             .fill(Color.blue)
-                            .frame(width: geometry.size.width * progress, height: 2)
+                            .frame(width: geometry.size.width * progress, height: 3)
                     }
                 }
                 .frame(height: 2)
