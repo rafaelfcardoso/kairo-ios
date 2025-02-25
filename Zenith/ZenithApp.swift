@@ -137,11 +137,6 @@ struct ZenithApp: App {
                         .tabItem {
                             Label(Tab.dashboard.title, systemImage: Tab.dashboard.icon)
                         }
-                        .safeAreaInset(edge: .bottom) {
-                            if focusViewModel.isActive && focusViewModel.isMinimized {
-                                Color.clear.frame(height: 64)
-                            }
-                        }
                     
                     MainView()
                         .environmentObject(taskViewModel)
@@ -149,11 +144,6 @@ struct ZenithApp: App {
                         .tag(Tab.today)
                         .tabItem {
                             Label(Tab.today.title, systemImage: Tab.today.icon)
-                        }
-                        .safeAreaInset(edge: .bottom) {
-                            if focusViewModel.isActive && focusViewModel.isMinimized {
-                                Color.clear.frame(height: 64)
-                            }
                         }
                     
                     Color.clear
@@ -167,11 +157,6 @@ struct ZenithApp: App {
                         .tag(Tab.blocks)
                         .tabItem {
                             Label(Tab.blocks.title, systemImage: Tab.blocks.icon)
-                        }
-                        .safeAreaInset(edge: .bottom) {
-                            if focusViewModel.isActive && focusViewModel.isMinimized {
-                                Color.clear.frame(height: 64)
-                            }
                         }
                 }
                 .onChange(of: selectedTab) { oldTab, newTab in
@@ -190,25 +175,32 @@ struct ZenithApp: App {
                 
                 // Minimized Focus Session
                 if focusViewModel.isActive && focusViewModel.isMinimized {
-                    MinimizedFocusSession(
-                        taskTitle: focusViewModel.selectedTask?.title ?? "Sessão de Foco",
-                        progress: focusViewModel.progress,
-                        remainingTime: focusViewModel.remainingTime,
-                        blockDistractions: focusViewModel.blockDistractions,
-                        onExpand: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                focusViewModel.isMinimized = false
-                                showingFocusSession = true
-                            }
-                        }
-                    )
+                    VStack {
+                        Spacer()
+                        MinimizedFocusSession(
+                            taskTitle: focusViewModel.selectedTask?.title ?? "Sessão de Foco",
+                            progress: focusViewModel.progress,
+                            remainingTime: focusViewModel.remainingTime,
+                            blockDistractions: focusViewModel.blockDistractions,
+                            onExpand: focusViewModel.expandSession
+                        )
+                        .transition(.move(edge: .bottom))
+                    }
+                    .padding(.bottom, 49) // Standard tab bar height
                 }
             }
-            .fullScreenCover(isPresented: $showingFocusSession) {
-                FocusSessionView()
-                    .environmentObject(taskViewModel)
-                    .environmentObject(focusViewModel)
+            .overlay {
+                if focusViewModel.isExpanded {
+                    FocusSessionView()
+                        .environmentObject(taskViewModel)
+                        .environmentObject(focusViewModel)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .bottom).combined(with: .opacity),
+                            removal: .move(edge: .bottom).combined(with: .opacity)
+                        ))
+                }
             }
+            .animation(.spring(response: 0.4, dampingFraction: 0.9), value: focusViewModel.isExpanded)
             .sheet(isPresented: $showingTaskInput) {
                 TaskInputView(
                     onSubmit: { taskText in

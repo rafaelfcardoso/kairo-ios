@@ -4,6 +4,7 @@ import Combine
 class FocusSessionViewModel: ObservableObject {
     @Published var isActive = false
     @Published var isMinimized = false
+    @Published var isExpanded = false
     @Published var selectedTask: TodoTask?
     @Published var timerDuration: TimeInterval = 25 * 60
     @Published var remainingTime: TimeInterval = 25 * 60
@@ -19,19 +20,22 @@ class FocusSessionViewModel: ObservableObject {
     
     func startSession() {
         isActive = true
+        isExpanded = true
         startTimer()
     }
     
+    func dismissSession() {
+        isExpanded = false
+    }
+    
     func minimizeSession() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            isMinimized = true
-        }
+        isMinimized = true
+        isExpanded = false
     }
     
     func expandSession() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            isMinimized = false
-        }
+        isMinimized = false
+        isExpanded = true
     }
     
     func forfeitSession() {
@@ -66,6 +70,7 @@ class FocusSessionViewModel: ObservableObject {
     private func resetSession() {
         isActive = false
         isMinimized = false
+        isExpanded = false
         remainingTime = timerDuration
         selectedTask = nil
     }
