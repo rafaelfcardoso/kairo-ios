@@ -24,5 +24,20 @@ struct Tag: Codable {
 }
 
 struct FocusSession: Codable {
-    // Add properties when needed
+    let id: String?
+    let startTime: String
+    let endTime: String?
+    let taskIds: [String]?
+    let duration: Int?
+    let isCompleted: Bool?
+    
+    // For creating a new focus session
+    init(taskIds: [String]) {
+        self.id = nil
+        self.startTime = ISO8601DateFormatter().string(from: Date())
+        self.endTime = nil
+        self.taskIds = taskIds
+        self.duration = nil
+        self.isCompleted = nil
+    }
 } 
