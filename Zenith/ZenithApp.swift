@@ -178,7 +178,7 @@ struct ZenithApp: App {
                     VStack {
                         Spacer()
                         MinimizedFocusSession(
-                            taskTitle: focusViewModel.selectedTask?.title ?? "Sessão de Foco",
+                            taskTitle: focusViewModel.selectedTask?.title,
                             progress: focusViewModel.progress,
                             remainingTime: focusViewModel.remainingTime,
                             blockDistractions: focusViewModel.blockDistractions,

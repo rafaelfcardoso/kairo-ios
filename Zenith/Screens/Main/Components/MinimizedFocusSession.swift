@@ -2,7 +2,7 @@ import SwiftUI
 
 struct MinimizedFocusSession: View {
     @Environment(\.colorScheme) private var colorScheme
-    let taskTitle: String
+    let taskTitle: String?
     let progress: Double
     let remainingTime: TimeInterval
     let blockDistractions: Bool
@@ -26,6 +26,10 @@ struct MinimizedFocusSession: View {
         return String(format: "%02d:%02d", minutes, seconds)
     }
     
+    var displayTaskTitle: String {
+        return taskTitle ?? "Sessão de foco"
+    }
+    
     var body: some View {
         Button(action: onExpand) {
             VStack(spacing: 0) {
@@ -33,9 +37,9 @@ struct MinimizedFocusSession: View {
                 HStack(spacing: 12) {
                     // Task info and time
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(taskTitle)
+                        Text(displayTaskTitle)
                             .font(.subheadline.weight(.medium))
-                            .foregroundColor(textColor)
+                            .foregroundColor(taskTitle == nil ? secondaryTextColor : textColor)
                             .lineLimit(1)
                         
                         HStack(spacing: 8) {
@@ -45,15 +49,16 @@ struct MinimizedFocusSession: View {
                             
                             if blockDistractions {
                                 HStack(spacing: 4) {
-                                    Image(systemName: "moon.fill")
+                                    Image(systemName: "shield")
                                         .font(.caption)
-                                    Text("Modo Foco")
+                                    Text("Distrações bloqueadas")
                                         .font(.caption)
                                 }
                                 .foregroundColor(.blue)
                             }
                         }
                     }
+                    Spacer()
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 16)
@@ -83,7 +88,7 @@ struct MinimizedFocusSession: View {
         }
         .buttonStyle(PlainButtonStyle())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Sessão de foco em andamento: \(taskTitle)")
+        .accessibilityLabel("Sessão de foco em andamento: \(displayTaskTitle)")
         .accessibilityValue("Tempo restante: \(formattedTime)")
         .accessibilityHint("Toque duas vezes para expandir a sessão")
     }
