@@ -121,53 +121,94 @@ class HapticManager {
 @main
 struct ZenithApp: App {
     @StateObject private var taskViewModel = TaskViewModel()
+    @StateObject private var focusViewModel = FocusSessionViewModel()
     @State private var selectedTab: Tab = .today
     @State private var showingTaskInput = false
+    @State private var showingFocusSession = false
     @Environment(\.colorScheme) var colorScheme
     
     var body: some Scene {
         WindowGroup {
-            TabView(selection: $selectedTab) {
-                DashboardView()
-                    .environmentObject(taskViewModel)
-                    .tag(Tab.dashboard)
-                    .tabItem {
-                        Label(Tab.dashboard.title, systemImage: Tab.dashboard.icon)
-                    }
-                
-                MainView()
-                    .environmentObject(taskViewModel)
-                    .tag(Tab.today)
-                    .tabItem {
-                        Label(Tab.today.title, systemImage: Tab.today.icon)
-                    }
-                
-                Color.clear
-                    .tag(Tab.create)
-                    .tabItem {
-                        Image(systemName: Tab.create.icon)
-                            .font(.system(size: 22, weight: .semibold))
-                    }
-                
-                BlocksView()
-                    .tag(Tab.blocks)
-                    .tabItem {
-                        Label(Tab.blocks.title, systemImage: Tab.blocks.icon)
-                    }
-            }
-            .onChange(of: selectedTab) { oldTab, newTab in
-                if newTab == .create {
-                    showingTaskInput = true
-                    withAnimation(.none) {
-                        selectedTab = oldTab
+            ZStack(alignment: .bottom) {
+                TabView(selection: $selectedTab) {
+                    DashboardView()
+                        .environmentObject(taskViewModel)
+                        .tag(Tab.dashboard)
+                        .tabItem {
+                            Label(Tab.dashboard.title, systemImage: Tab.dashboard.icon)
+                        }
+                        .safeAreaInset(edge: .bottom) {
+                            if focusViewModel.isActive && focusViewModel.isMinimized {
+                                Color.clear.frame(height: 64)
+                            }
+                        }
+                    
+                    MainView()
+                        .environmentObject(taskViewModel)
+                        .environmentObject(focusViewModel)
+                        .tag(Tab.today)
+                        .tabItem {
+                            Label(Tab.today.title, systemImage: Tab.today.icon)
+                        }
+                        .safeAreaInset(edge: .bottom) {
+                            if focusViewModel.isActive && focusViewModel.isMinimized {
+                                Color.clear.frame(height: 64)
+                            }
+                        }
+                    
+                    Color.clear
+                        .tag(Tab.create)
+                        .tabItem {
+                            Image(systemName: Tab.create.icon)
+                                .font(.system(size: 22, weight: .semibold))
+                        }
+                    
+                    BlocksView()
+                        .tag(Tab.blocks)
+                        .tabItem {
+                            Label(Tab.blocks.title, systemImage: Tab.blocks.icon)
+                        }
+                        .safeAreaInset(edge: .bottom) {
+                            if focusViewModel.isActive && focusViewModel.isMinimized {
+                                Color.clear.frame(height: 64)
+                            }
+                        }
+                }
+                .onChange(of: selectedTab) { oldTab, newTab in
+                    if newTab == .create {
+                        showingTaskInput = true
+                        withAnimation(.none) {
+                            selectedTab = oldTab
+                        }
                     }
                 }
+                .onChange(of: colorScheme) { _, newValue in
+                    AppTheme.shared.colorScheme = newValue
+                }
+                .modifier(CustomTabBarStyle())
+                .tint(AppTheme.shared.activeColor)
+                
+                // Minimized Focus Session
+                if focusViewModel.isActive && focusViewModel.isMinimized {
+                    MinimizedFocusSession(
+                        taskTitle: focusViewModel.selectedTask?.title ?? "Sessão de Foco",
+                        progress: focusViewModel.progress,
+                        remainingTime: focusViewModel.remainingTime,
+                        blockDistractions: focusViewModel.blockDistractions,
+                        onExpand: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                focusViewModel.isMinimized = false
+                                showingFocusSession = true
+                            }
+                        }
+                    )
+                }
             }
-            .onChange(of: colorScheme) { _, newValue in
-                AppTheme.shared.colorScheme = newValue
+            .fullScreenCover(isPresented: $showingFocusSession) {
+                FocusSessionView()
+                    .environmentObject(taskViewModel)
+                    .environmentObject(focusViewModel)
             }
-            .modifier(CustomTabBarStyle())
-            .tint(AppTheme.shared.activeColor)
             .sheet(isPresented: $showingTaskInput) {
                 TaskInputView(
                     onSubmit: { taskText in
