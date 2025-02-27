@@ -159,7 +159,7 @@ class TaskViewModel: ObservableObject {
     }
     
     func completeTask(_ task: TodoTask) async throws {
-        let endpointURL = try APIConfig.getEndpointURL("/tasks/\(task.id)/status")
+        let endpointURL = try APIConfig.getEndpointURL("/tasks/\(task.id)")
         guard let url = URL(string: endpointURL) else {
             throw APIError.invalidURL(endpointURL)
         }
@@ -201,7 +201,7 @@ class TaskViewModel: ObservableObject {
     func undoLastCompletion() async throws {
         guard let task = lastCompletedTask else { return }
         
-        let endpointURL = try APIConfig.getEndpointURL("/tasks/\(task.id)/status")
+        let endpointURL = try APIConfig.getEndpointURL("/tasks/\(task.id)")
         guard let url = URL(string: endpointURL) else {
             throw APIError.invalidURL(endpointURL)
         }
@@ -219,14 +219,11 @@ class TaskViewModel: ObservableObject {
         // Use the generic request executor
         let _: EmptyResponse = try await executeRequest(request)
         
-        // Clear the stored task
+        // Reset state
         lastCompletedTask = nil
+        lastCompletedTaskTitle = ""
         
-        // Add a small delay to prevent immediate re-completion
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-        
-        // Refresh the task lists
-        invalidateCache()
+        // Reload tasks to get the restored task
         try await loadAllTasks()
     }
     
@@ -390,5 +387,52 @@ class TaskViewModel: ObservableObject {
         timeWorkedToday += duration
         focusSessionHistory.append((date: Date(), duration: duration))
         // Persist to storage
+    }
+    
+    // MARK: - Task Filtering Properties
+    
+    var todayTasks: [TodoTask] {
+        // Regular today tasks are already filtered in the loadTasks method
+        return tasks
+    }
+    
+    var upcomingTasks: [TodoTask] {
+        // Filter tasks with future dates (not today)
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
+        
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        return tasks.filter { task in
+            guard let dueDateString = task.dueDate,
+                  let dueDate = dateFormatter.date(from: dueDateString) else {
+                return false
+            }
+            
+            let taskDay = calendar.startOfDay(for: dueDate)
+            return taskDay >= tomorrow
+        }
+    }
+    
+    var inboxTasks: [TodoTask] {
+        // Tasks with no project or in the system project
+        return tasks.filter { task in
+            task.project == nil || task.project?.isSystem == true
+        }
+    }
+    
+    var completedTasks: [TodoTask] {
+        // For completed tasks, we would need another API call
+        // This is a placeholder
+        return []
+    }
+    
+    var focusTasks: [TodoTask] {
+        // Tasks suitable for focus sessions (perhaps based on priority)
+        return tasks.filter { task in
+            task.priority == "HIGH"
+        }
     }
 } 
