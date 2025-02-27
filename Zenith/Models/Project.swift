@@ -1,6 +1,6 @@
 import Foundation
 
-struct Project: Identifiable, Codable {
+struct Project: Identifiable, Codable, Hashable {
     let id: String
     let name: String
     let description: String?
@@ -40,5 +40,14 @@ struct Project: Identifiable, Codable {
         // Normalize system project name
         let rawName = try container.decode(String.self, forKey: .name)
         name = isSystem ? "Entrada" : rawName
+    }
+    
+    // Implement Hashable conformance
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: Project, rhs: Project) -> Bool {
+        return lhs.id == rhs.id
     }
 } 

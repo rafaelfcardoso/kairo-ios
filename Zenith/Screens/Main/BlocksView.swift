@@ -2,7 +2,10 @@ import SwiftUI
 
 struct BlocksView: View {
     @StateObject private var viewModel = BlocksViewModel()
+    @EnvironmentObject var projectViewModel: ProjectViewModel
+    @EnvironmentObject var focusSessionViewModel: FocusSessionViewModel
     @Environment(\.colorScheme) var colorScheme
+    @Binding var showingSidebar: Bool
     
     var cardBackgroundColor: Color {
         colorScheme == .dark ? Color(UIColor.systemGray6) : .white
@@ -12,42 +15,69 @@ struct BlocksView: View {
         colorScheme == .dark ? .black : Color(hex: "F1F2F4")
     }
     
+    var textColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+    
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                InsightsDashboard(
-                    focusScore: viewModel.focusScore,
-                    focusTrend: viewModel.focusTrend,
-                    screenTime: viewModel.screenTime,
-                    protectedTime: viewModel.protectedTime,
-                    timeDistribution: viewModel.timeDistribution
-                )
-                .background(cardBackgroundColor)
-                .cornerRadius(12)
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 5, x: 0, y: 2)
-                
-                ActiveShieldStatus(
-                    mode: viewModel.currentMode,
-                    isActive: viewModel.isShieldActive,
-                    blockCount: viewModel.activeBlockCount,
-                    onToggle: viewModel.toggleShield
-                )
-                .background(cardBackgroundColor)
-                .cornerRadius(12)
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 5, x: 0, y: 2)
-                
-                StatisticsCards(
-                    blocksToday: viewModel.blocksToday,
-                    blocksTrend: viewModel.blocksTrend,
-                    savedTime: viewModel.savedTime,
-                    savedTimeTrend: viewModel.savedTimeTrend
-                )
+        ZStack {
+            // Background
+            backgroundColor.ignoresSafeArea()
+            
+            // Content
+            ScrollView {
+                VStack(spacing: 20) {
+                    InsightsDashboard(
+                        focusScore: viewModel.focusScore,
+                        focusTrend: viewModel.focusTrend,
+                        screenTime: viewModel.screenTime,
+                        protectedTime: viewModel.protectedTime,
+                        timeDistribution: viewModel.timeDistribution
+                    )
+                    .background(cardBackgroundColor)
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 5, x: 0, y: 2)
+                    
+                    ActiveShieldStatus(
+                        mode: viewModel.currentMode,
+                        isActive: viewModel.isShieldActive,
+                        blockCount: viewModel.activeBlockCount,
+                        onToggle: viewModel.toggleShield
+                    )
+                    .background(cardBackgroundColor)
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 5, x: 0, y: 2)
+                    
+                    StatisticsCards(
+                        blocksToday: viewModel.blocksToday,
+                        blocksTrend: viewModel.blocksTrend,
+                        savedTime: viewModel.savedTime,
+                        savedTimeTrend: viewModel.savedTimeTrend
+                    )
+                }
+                .padding()
             }
-            .padding()
         }
-        .background(backgroundColor.edgesIgnoringSafeArea(.all))
         .navigationTitle("Blocks")
-        .navigationBarItems(trailing: settingsButton)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showingSidebar = true
+                        HapticManager.shared.impact(style: .medium)
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.title3)
+                        .foregroundColor(textColor)
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                settingsButton
+            }
+        }
         .refreshable {
             await viewModel.refreshData()
         }
@@ -56,7 +86,8 @@ struct BlocksView: View {
     private var settingsButton: some View {
         Button(action: viewModel.openSettings) {
             Image(systemName: "gear")
-                .foregroundColor(.primary)
+                .font(.title3)
+                .foregroundColor(textColor)
         }
     }
 }
@@ -66,12 +97,14 @@ struct BlocksView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
             NavigationView {
-                BlocksView()
+                BlocksView(showingSidebar: .constant(false))
+                    .environmentObject(ProjectViewModel())
             }
             .preferredColorScheme(.light)
             
             NavigationView {
-                BlocksView()
+                BlocksView(showingSidebar: .constant(false))
+                    .environmentObject(ProjectViewModel())
             }
             .preferredColorScheme(.dark)
         }
