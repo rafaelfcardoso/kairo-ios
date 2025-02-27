@@ -31,12 +31,10 @@ struct DashboardErrorView: View {
 }
 
 struct DashboardView: View {
-    @StateObject private var projectViewModel = ProjectViewModel()
+    @EnvironmentObject var projectViewModel: ProjectViewModel
     @EnvironmentObject var taskViewModel: TaskViewModel
     @Environment(\.colorScheme) var colorScheme
     @State private var showingCreateProject = false
-    @State private var isLoading = true
-    @State private var hasError = false
     @State private var expandedProjects = true
     
     var backgroundColor: Color {
@@ -68,7 +66,7 @@ struct DashboardView: View {
             ZStack {
                 backgroundColor.edgesIgnoringSafeArea(.all)
                 
-                if isLoading {
+                if projectViewModel.isLoading {
                     ProgressView()
                 } else {
                     ScrollView {
@@ -126,13 +124,13 @@ struct DashboardView: View {
                                 .padding(.horizontal)
                                 
                                 if expandedProjects {
-                                    if hasError {
+                                    if projectViewModel.hasError {
                                         DashboardErrorView(
                                             secondaryTextColor: secondaryTextColor,
                                             textColor: textColor,
                                             retryAction: {
                                                 Task {
-                                                    await loadProjects()
+                                                    try? await projectViewModel.loadProjects(forceRefresh: true)
                                                 }
                                             }
                                         )
@@ -147,32 +145,32 @@ struct DashboardView: View {
                         }
                         .padding()
                     }
+                    .refreshable {
+                        do {
+                            try await projectViewModel.loadProjects(forceRefresh: true)
+                        } catch {
+                            print("Error refreshing projects: \(error)")
+                        }
+                    }
                 }
             }
             .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.inline)
             .task {
-                await loadProjects()
+                // Use the cached data if available, or load from API
+                if projectViewModel.projects.isEmpty {
+                    do {
+                        try await projectViewModel.loadProjects()
+                    } catch {
+                        print("Error loading projects: \(error)")
+                    }
+                }
             }
             .sheet(isPresented: $showingCreateProject) {
                 CreateProjectView(viewModel: projectViewModel)
                     .presentationDetents([.medium])
                     .presentationDragIndicator(.visible)
             }
-        }
-    }
-    
-    private func loadProjects() async {
-        isLoading = true
-        hasError = false
-        
-        do {
-            try await projectViewModel.loadProjects()
-            isLoading = false
-        } catch {
-            isLoading = false
-            hasError = true
-            print("Error loading projects: \(error)")
         }
     }
     
@@ -226,11 +224,14 @@ struct DashboardView_Previews: PreviewProvider {
                     Text("Dashboard")
                 }
             
-            MainView()
+            MainView(showingSidebar: .constant(false))
                 .tabItem {
                     Image(systemName: "filemenu.and.selection")
                     Text("Hoje")
                 }
         }
+        .environmentObject(TaskViewModel())
+        .environmentObject(ProjectViewModel())
+        .environmentObject(FocusSessionViewModel())
     }
 } 
