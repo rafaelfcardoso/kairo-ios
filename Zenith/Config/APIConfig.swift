@@ -4,9 +4,12 @@ enum APIError: LocalizedError {
     case unauthorized
     case authenticationFailed(String)
     case invalidResponse
+    case decodingError(Error)
     case networkError(Error)
     case invalidURL(String)
     case malformedEndpoint(String)
+    case serverError(Int, String)
+    case clientError(Int, String)
     
     var errorDescription: String? {
         switch self {
@@ -16,12 +19,18 @@ enum APIError: LocalizedError {
             return "Authentication failed: \(message)"
         case .invalidResponse:
             return "Invalid response from server"
+        case .decodingError(let error):
+            return "Failed to decode response: \(error.localizedDescription)"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
         case .invalidURL(let url):
             return "Invalid URL construction: \(url)"
         case .malformedEndpoint(let endpoint):
             return "Malformed endpoint path: \(endpoint)"
+        case .serverError(let code, let message):
+            return "Server error (\(code)): \(message)"
+        case .clientError(let code, let message):
+            return "Client error (\(code)): \(message)"
         }
     }
 }
@@ -183,18 +192,26 @@ enum APIConfig {
     }
     
     static func handleAPIResponse(_ data: Data, _ response: HTTPURLResponse) throws {
-        // logDebug("Response Status: \(response.statusCode) for URL: \(response.url?.absoluteString ?? "unknown")")
-        // logResponseBody(data)
+        logDebug("Response Status: \(response.statusCode) for URL: \(response.url?.absoluteString ?? "unknown")")
+        logResponseBody(data)
         
         guard (200...299).contains(response.statusCode) else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "No error message available"
+            
             switch response.statusCode {
             case 401, 403:
                 throw handleAuthenticationError(response, data: data)
             case 404:
-                let errorMessage = String(data: data, encoding: .utf8) ?? "Endpoint not found"
                 logDebug("Endpoint not found: \(errorMessage)")
                 throw APIError.malformedEndpoint("Endpoint not found: \(response.url?.path ?? "unknown path")")
+            case 400...499:
+                logDebug("Client error: \(response.statusCode) - \(errorMessage)")
+                throw APIError.clientError(response.statusCode, errorMessage)
+            case 500...599:
+                logDebug("Server error: \(response.statusCode) - \(errorMessage)")
+                throw APIError.serverError(response.statusCode, errorMessage)
             default:
+                logDebug("Unhandled error: \(response.statusCode) - \(errorMessage)")
                 throw APIError.invalidResponse
             }
         }

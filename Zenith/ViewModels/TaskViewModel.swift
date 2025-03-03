@@ -14,15 +14,28 @@ class TaskViewModel: ObservableObject {
     @Published var lastCompletedTaskTitle: String = ""
     @Published var timeWorkedToday: TimeInterval = 0
     @Published var focusSessionHistory: [(date: Date, duration: TimeInterval)] = []
+    @Published var isOfflineMode = false
+    @Published var lastSuccessfulSync: Date? = nil
+    
     private let baseURL = APIConfig.baseURL
     private var currentTask: Task<Void, Error>? // This is a Swift concurrency task
     private var lastFetchTime: Date?
     private let cacheTimeout: TimeInterval = 120 // 120 seconds cache
     private var lastOverdueFetchTime: Date?  // Add this for overdue tasks cache
     private var lastCompletedTask: TodoTask? // Store the last completed task for undo
+    private var offlineTasksCache: [TodoTask] = []
+    private var offlineOverdueTasksCache: [TodoTask] = []
+    
+    // Keys for UserDefaults
+    private let tasksCacheKey = "cached_tasks"
+    private let overdueTasksCacheKey = "cached_overdue_tasks"
+    private let lastSyncKey = "last_successful_sync"
     
     init() {
         updateDateTime()
+        
+        // Load cached data from disk
+        loadOfflineCacheFromDisk()
         
         // Observe when app becomes active
         NotificationCenter.default.addObserver(
@@ -60,7 +73,7 @@ class TaskViewModel: ObservableObject {
         formattedDate = dateFormatter.string(from: date)
     }
     
-    private func executeRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
+    private func executeRequest<T: Decodable>(_ request: URLRequest, retryCount: Int = 0, maxRetries: Int = 3) async throws -> T {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -71,7 +84,15 @@ class TaskViewModel: ObservableObject {
             try APIConfig.handleAPIResponse(data, httpResponse)
             
             // If successful, decode the data
-            return try JSONDecoder().decode(T.self, from: data)
+            do {
+                return try JSONDecoder().decode(T.self, from: data)
+            } catch {
+                print("Decoding error: \(error)")
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("Response that failed to decode: \(responseString)")
+                }
+                throw APIError.decodingError(error)
+            }
         } catch let error as APIError {
             if case .unauthorized = error {
                 // If unauthorized, try to authenticate and retry once
@@ -87,9 +108,111 @@ class TaskViewModel: ObservableObject {
                 }
                 
                 try APIConfig.handleAPIResponse(retryData, httpResponse)
-                return try JSONDecoder().decode(T.self, from: retryData)
+                
+                do {
+                    return try JSONDecoder().decode(T.self, from: retryData)
+                } catch {
+                    print("Decoding error after retry: \(error)")
+                    if let responseString = String(data: retryData, encoding: .utf8) {
+                        print("Response that failed to decode after retry: \(responseString)")
+                    }
+                    throw APIError.decodingError(error)
+                }
+            } else if case .serverError = error, retryCount < maxRetries {
+                // For server errors, implement exponential backoff retry
+                let delay = pow(2.0, Double(retryCount)) // Exponential backoff: 1, 2, 4, 8 seconds
+                print("🌐 [API] Server error, retrying in \(delay) seconds (attempt \(retryCount + 1)/\(maxRetries))")
+                
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                return try await executeRequest(request, retryCount: retryCount + 1, maxRetries: maxRetries)
             }
             throw error
+        } catch {
+            // For network errors, also implement retry with backoff
+            if (error as NSError).domain == NSURLErrorDomain && retryCount < maxRetries {
+                let delay = pow(2.0, Double(retryCount)) // Exponential backoff
+                print("🌐 [API] Network error, retrying in \(delay) seconds (attempt \(retryCount + 1)/\(maxRetries))")
+                
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                return try await executeRequest(request, retryCount: retryCount + 1, maxRetries: maxRetries)
+            }
+            throw APIError.networkError(error)
+        }
+    }
+    
+    // Save offline cache to disk
+    private func saveOfflineCacheToDisk() {
+        let encoder = JSONEncoder()
+        
+        // Save tasks cache
+        if !offlineTasksCache.isEmpty {
+            do {
+                let data = try encoder.encode(offlineTasksCache)
+                UserDefaults.standard.set(data, forKey: tasksCacheKey)
+                print("🌐 [Tasks] Saved \(offlineTasksCache.count) tasks to local cache")
+            } catch {
+                print("🌐 [Tasks] Error saving tasks to cache: \(error)")
+            }
+        }
+        
+        // Save overdue tasks cache
+        if !offlineOverdueTasksCache.isEmpty {
+            do {
+                let data = try encoder.encode(offlineOverdueTasksCache)
+                UserDefaults.standard.set(data, forKey: overdueTasksCacheKey)
+                print("🌐 [Tasks] Saved \(offlineOverdueTasksCache.count) overdue tasks to local cache")
+            } catch {
+                print("🌐 [Tasks] Error saving overdue tasks to cache: \(error)")
+            }
+        }
+        
+        // Save last sync time
+        if let lastSync = lastSuccessfulSync {
+            UserDefaults.standard.set(lastSync, forKey: lastSyncKey)
+        }
+    }
+    
+    // Load offline cache from disk
+    private func loadOfflineCacheFromDisk() {
+        let decoder = JSONDecoder()
+        
+        // Load tasks cache
+        if let data = UserDefaults.standard.data(forKey: tasksCacheKey) {
+            do {
+                let cachedTasks = try decoder.decode([TodoTask].self, from: data)
+                self.offlineTasksCache = cachedTasks
+                
+                // If we have cached tasks, use them initially
+                if !cachedTasks.isEmpty && self.tasks.isEmpty {
+                    self.tasks = cachedTasks
+                    self.isOfflineMode = true
+                    print("🌐 [Tasks] Loaded \(cachedTasks.count) tasks from local cache")
+                }
+            } catch {
+                print("🌐 [Tasks] Error loading tasks from cache: \(error)")
+            }
+        }
+        
+        // Load overdue tasks cache
+        if let data = UserDefaults.standard.data(forKey: overdueTasksCacheKey) {
+            do {
+                let cachedOverdueTasks = try decoder.decode([TodoTask].self, from: data)
+                self.offlineOverdueTasksCache = cachedOverdueTasks
+                
+                // If we have cached overdue tasks, use them initially
+                if !cachedOverdueTasks.isEmpty && self.overdueTasks.isEmpty {
+                    self.overdueTasks = cachedOverdueTasks
+                    self.isOfflineMode = true
+                    print("🌐 [Tasks] Loaded \(cachedOverdueTasks.count) overdue tasks from local cache")
+                }
+            } catch {
+                print("🌐 [Tasks] Error loading overdue tasks from cache: \(error)")
+            }
+        }
+        
+        // Load last sync time
+        if let lastSync = UserDefaults.standard.object(forKey: lastSyncKey) as? Date {
+            self.lastSuccessfulSync = lastSync
         }
     }
     
@@ -108,51 +231,106 @@ class TaskViewModel: ObservableObject {
         
         // Create a new task
         currentTask = Task {
-            let endpointURL = try APIConfig.getEndpointURL("/tasks")
-            var urlComponents = URLComponents(string: endpointURL)!
-            var queryItems = [
-                URLQueryItem(name: "includeArchived", value: "false"),
-                URLQueryItem(name: "status", value: "not_started")
-            ]
-            
-            if let projectId = projectId {
-                queryItems.append(URLQueryItem(name: "projectId", value: projectId))
-            }
-            
-            urlComponents.queryItems = queryItems
-            
-            guard let url = urlComponents.url else {
-                throw APIError.invalidURL(urlComponents.description)
-            }
-            
-            var request = URLRequest(url: url)
-            request.setValue("application/json", forHTTPHeaderField: "accept")
-            APIConfig.addAuthHeaders(to: &request)
-            
-            let decodedTasks: [TodoTask] = try await executeRequest(request)
-            
-            if forToday {
-                // Filter tasks for today after receiving them
-                let calendar = Calendar.current
-                let today = calendar.startOfDay(for: Date())
+            do {
+                let endpointURL = try APIConfig.getEndpointURL("/tasks")
+                var urlComponents = URLComponents(string: endpointURL)!
+                var queryItems = [
+                    URLQueryItem(name: "includeArchived", value: "false"),
+                    URLQueryItem(name: "status", value: "not_started")
+                ]
                 
-                let dateFormatter = ISO8601DateFormatter()
-                dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                
-                tasks = decodedTasks.filter { task in
-                    guard let dueDateString = task.dueDate,
-                          let dueDate = dateFormatter.date(from: dueDateString) else {
-                        return false
-                    }
-                    
-                    let taskDay = calendar.startOfDay(for: dueDate)
-                    return calendar.isDate(taskDay, inSameDayAs: today)
+                if let projectId = projectId {
+                    queryItems.append(URLQueryItem(name: "projectId", value: projectId))
                 }
-            } else {
-                tasks = decodedTasks
+                
+                urlComponents.queryItems = queryItems
+                
+                guard let url = urlComponents.url else {
+                    throw APIError.invalidURL(urlComponents.description)
+                }
+                
+                print("🌐 [Tasks] Request URL: \(url.absoluteString)")
+                
+                var request = URLRequest(url: url)
+                request.setValue("application/json", forHTTPHeaderField: "accept")
+                APIConfig.addAuthHeaders(to: &request)
+                
+                let decodedTasks: [TodoTask] = try await executeRequest(request)
+                print("🌐 [Tasks] Successfully loaded \(decodedTasks.count) tasks")
+                
+                // Store in offline cache
+                self.offlineTasksCache = decodedTasks
+                self.lastSuccessfulSync = Date()
+                self.isOfflineMode = false
+                
+                // Save to disk
+                saveOfflineCacheToDisk()
+                
+                if forToday {
+                    // Filter for today's tasks
+                    let calendar = Calendar.current
+                    let today = calendar.startOfDay(for: Date())
+                    let dateFormatter = ISO8601DateFormatter()
+                    dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    
+                    tasks = decodedTasks.filter { task in
+                        guard let dueDateString = task.dueDate,
+                              let dueDate = dateFormatter.date(from: dueDateString) else {
+                            return false
+                        }
+                        
+                        let taskDay = calendar.startOfDay(for: dueDate)
+                        return calendar.isDate(taskDay, inSameDayAs: today)
+                    }
+                } else {
+                    tasks = decodedTasks
+                }
+                
+                lastFetchTime = Date()
+            } catch {
+                print("🌐 [Tasks] Error loading tasks: \(error.localizedDescription)")
+                
+                // Switch to offline mode if we have cached data
+                if !self.offlineTasksCache.isEmpty {
+                    print("🌐 [Tasks] Switching to offline mode with \(self.offlineTasksCache.count) cached tasks")
+                    self.isOfflineMode = true
+                    
+                    if forToday {
+                        // Filter cached tasks for today
+                        let calendar = Calendar.current
+                        let today = calendar.startOfDay(for: Date())
+                        let dateFormatter = ISO8601DateFormatter()
+                        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                        
+                        tasks = self.offlineTasksCache.filter { task in
+                            guard let dueDateString = task.dueDate,
+                                  let dueDate = dateFormatter.date(from: dueDateString) else {
+                                return false
+                            }
+                            
+                            let taskDay = calendar.startOfDay(for: dueDate)
+                            return calendar.isDate(taskDay, inSameDayAs: today)
+                        }
+                    } else {
+                        tasks = self.offlineTasksCache
+                    }
+                } else {
+                    // No cached data available, propagate the error
+                    if let apiError = error as? APIError {
+                        switch apiError {
+                        case .decodingError(let decodingError):
+                            print("🌐 [Tasks] Decoding error details: \(decodingError)")
+                        case .clientError(let code, let message):
+                            print("🌐 [Tasks] Client error (\(code)): \(message)")
+                        case .serverError(let code, let message):
+                            print("🌐 [Tasks] Server error (\(code)): \(message)")
+                        default:
+                            print("🌐 [Tasks] API error: \(apiError.localizedDescription)")
+                        }
+                    }
+                    throw error
+                }
             }
-            
-            lastFetchTime = Date()
         }
         
         try await currentTask?.value
@@ -329,19 +507,58 @@ class TaskViewModel: ObservableObject {
         }
         
         print("Fetching new overdue tasks data")
-        let endpointURL = try APIConfig.getEndpointURL("/tasks/views/overdue")
-        let urlComponents = URLComponents(string: endpointURL)!
         
-        guard let url = urlComponents.url else {
-            throw APIError.invalidURL(urlComponents.description)
+        do {
+            let endpointURL = try APIConfig.getEndpointURL("/tasks/views/overdue")
+            let urlComponents = URLComponents(string: endpointURL)!
+            
+            guard let url = urlComponents.url else {
+                throw APIError.invalidURL(urlComponents.description)
+            }
+            
+            print("🌐 [Tasks] Overdue request URL: \(url.absoluteString)")
+            
+            var request = URLRequest(url: url)
+            request.setValue("application/json", forHTTPHeaderField: "accept")
+            APIConfig.addAuthHeaders(to: &request)
+            
+            overdueTasks = try await executeRequest(request)
+            
+            // Store in offline cache
+            self.offlineOverdueTasksCache = overdueTasks
+            self.lastSuccessfulSync = Date()
+            self.isOfflineMode = false
+            
+            // Save to disk
+            saveOfflineCacheToDisk()
+            
+            print("🌐 [Tasks] Successfully loaded \(overdueTasks.count) overdue tasks")
+            lastOverdueFetchTime = Date()  // Update cache timestamp
+        } catch {
+            print("🌐 [Tasks] Error loading overdue tasks: \(error.localizedDescription)")
+            
+            // Switch to offline mode if we have cached data
+            if !self.offlineOverdueTasksCache.isEmpty {
+                print("🌐 [Tasks] Switching to offline mode with \(self.offlineOverdueTasksCache.count) cached overdue tasks")
+                self.isOfflineMode = true
+                overdueTasks = self.offlineOverdueTasksCache
+            } else {
+                // No cached data available, propagate the error
+                if let apiError = error as? APIError {
+                    switch apiError {
+                    case .decodingError(let decodingError):
+                        print("🌐 [Tasks] Overdue decoding error details: \(decodingError)")
+                    case .clientError(let code, let message):
+                        print("🌐 [Tasks] Overdue client error (\(code)): \(message)")
+                    case .serverError(let code, let message):
+                        print("🌐 [Tasks] Overdue server error (\(code)): \(message)")
+                    default:
+                        print("🌐 [Tasks] Overdue API error: \(apiError.localizedDescription)")
+                    }
+                }
+                throw error
+            }
         }
-        
-        var request = URLRequest(url: url)
-        request.setValue("application/json", forHTTPHeaderField: "accept")
-        APIConfig.addAuthHeaders(to: &request)
-        
-        overdueTasks = try await executeRequest(request)
-        lastOverdueFetchTime = Date()  // Update cache timestamp
     }
     
     func loadAllTasks() async throws {
@@ -363,16 +580,44 @@ class TaskViewModel: ObservableObject {
         }
         
         // Load both task types concurrently
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask {
-                try await self.loadOverdueTasks()
+        do {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    do {
+                        try await self.loadOverdueTasks()
+                    } catch {
+                        print("🌐 [Tasks] Error in loadAllTasks (overdue): \(error.localizedDescription)")
+                        throw error
+                    }
+                }
+                
+                group.addTask {
+                    do {
+                        try await self.loadTasks(forToday: true)
+                    } catch {
+                        print("🌐 [Tasks] Error in loadAllTasks (today): \(error.localizedDescription)")
+                        throw error
+                    }
+                }
+                
+                try await group.waitForAll()
             }
-            
-            group.addTask {
-                try await self.loadTasks(forToday: true)
+            print("🌐 [Tasks] Successfully loaded all tasks: \(tasks.count) today tasks, \(overdueTasks.count) overdue tasks")
+        } catch {
+            print("🌐 [Tasks] Error loading all tasks: \(error.localizedDescription)")
+            if let apiError = error as? APIError {
+                switch apiError {
+                case .decodingError(let decodingError):
+                    print("🌐 [Tasks] All tasks decoding error details: \(decodingError)")
+                case .clientError(let code, let message):
+                    print("🌐 [Tasks] All tasks client error (\(code)): \(message)")
+                case .serverError(let code, let message):
+                    print("🌐 [Tasks] All tasks server error (\(code)): \(message)")
+                default:
+                    print("🌐 [Tasks] All tasks API error: \(apiError.localizedDescription)")
+                }
             }
-            
-            try await group.waitForAll()
+            throw error
         }
     }
     

@@ -29,61 +29,60 @@ struct InboxView: View {
         ZStack {
             backgroundColor.ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                if isLoading {
-                    ProgressView()
-                } else if hasError {
-                    ErrorView(
-                        secondaryTextColor: secondaryTextColor,
-                        textColor: textColor,
-                        retryAction: loadInboxTasks
-                    )
-                } else if inboxTasks.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 40))
-                            .foregroundColor(secondaryTextColor)
-                        
-                        Text("Sua Entrada está vazia")
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if hasError {
+                ErrorView(
+                    secondaryTextColor: secondaryTextColor,
+                    textColor: textColor,
+                    retryAction: loadInboxTasks
+                )
+            } else if inboxTasks.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "tray")
+                        .font(.system(size: 40))
+                        .foregroundColor(secondaryTextColor)
+                    
+                    Text("Sua Entrada está vazia")
+                        .font(.headline)
+                        .foregroundColor(textColor)
+                    
+                    Text("Tarefas sem um projeto específico aparecem aqui")
+                        .font(.subheadline)
+                        .foregroundColor(secondaryTextColor)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    
+                    Button {
+                        showingCreateTask = true
+                    } label: {
+                        Text("Criar tarefa")
                             .font(.headline)
-                            .foregroundColor(textColor)
-                        
-                        Text("Tarefas sem um projeto específico aparecem aqui")
-                            .font(.subheadline)
-                            .foregroundColor(secondaryTextColor)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                        
-                        Button {
-                            showingCreateTask = true
-                        } label: {
-                            Text("Criar tarefa")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(Color.blue)
-                                .cornerRadius(8)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.blue)
+                            .cornerRadius(8)
+                    }
+                    .padding(.top, 8)
+                }
+                .padding()
+            } else {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(inboxTasks) { task in
+                            TaskRow(
+                                task: task,
+                                viewModel: taskViewModel,
+                                isOverdue: false
+                            )
                         }
-                        .padding(.top, 8)
                     }
                     .padding()
-                } else {
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(inboxTasks) { task in
-                                TaskRow(
-                                    task: task,
-                                    viewModel: taskViewModel,
-                                    isOverdue: false
-                                )
-                            }
-                        }
-                        .padding()
-                    }
-                    .refreshable {
-                        loadInboxTasks()
-                    }
+                }
+                .refreshable {
+                    loadInboxTasks()
                 }
             }
         }

@@ -27,6 +27,8 @@ struct DashboardErrorView: View {
             .padding(.top, 8)
         }
         .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.clear)
     }
 }
 
@@ -125,15 +127,20 @@ struct DashboardView: View {
                                 
                                 if expandedProjects {
                                     if projectViewModel.hasError {
-                                        DashboardErrorView(
-                                            secondaryTextColor: secondaryTextColor,
-                                            textColor: textColor,
-                                            retryAction: {
-                                                Task {
-                                                    try? await projectViewModel.loadProjects(forceRefresh: true)
+                                        VStack {
+                                            Spacer()
+                                            DashboardErrorView(
+                                                secondaryTextColor: secondaryTextColor,
+                                                textColor: textColor,
+                                                retryAction: {
+                                                    Task {
+                                                        try? await projectViewModel.loadProjects(forceRefresh: true)
+                                                    }
                                                 }
-                                            }
-                                        )
+                                            )
+                                            Spacer()
+                                        }
+                                        .frame(height: 200) // Provide enough height for the error view
                                     } else {
                                         // Projects List (excluding Inbox)
                                         ForEach(projectViewModel.projects.filter { !$0.isSystem }) { project in
