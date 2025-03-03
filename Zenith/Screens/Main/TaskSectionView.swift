@@ -11,26 +11,50 @@ struct TaskSectionView: View {
     @Binding var showingCreateTask: Bool
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(title)
-                .font(.title2)
-                .bold()
-                .padding(.horizontal)
-                .padding(.top)
-            
-            if tasks.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle")
-                        .font(.system(size: 40))
-                        .foregroundColor(secondaryTextColor)
+        if tasks.isEmpty {
+            // Empty state - take up full space and center content
+            VStack(spacing: 16) {
+                Spacer()
+                
+                Image(systemName: "checkmark.circle")
+                    .font(.system(size: 60))
+                    .foregroundColor(secondaryTextColor)
+                
+                Text("Nenhuma tarefa")
+                    .font(.headline)
+                    .foregroundColor(secondaryTextColor)
                     
-                    Text("Nenhuma tarefa")
+                Text("Você está em dia com suas tarefas")
+                    .font(.subheadline)
+                    .foregroundColor(secondaryTextColor.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                
+                Button {
+                    showingCreateTask = true
+                } label: {
+                    Text("Adicionar tarefa")
                         .font(.headline)
-                        .foregroundColor(secondaryTextColor)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color.blue)
+                        .cornerRadius(8)
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 40)
-            } else {
+                .padding(.top, 16)
+                
+                Spacer()
+            }
+            .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            // Regular content with tasks
+            VStack(alignment: .leading, spacing: 16) {
+                Text(title)
+                    .font(.title2)
+                    .bold()
+                    .padding(.horizontal)
+                    .padding(.top)
+                
                 TaskListView(
                     showingCreateTask: $showingCreateTask,
                     tasks: tasks,
