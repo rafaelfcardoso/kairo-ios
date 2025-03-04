@@ -266,27 +266,37 @@ class TaskViewModel: ObservableObject {
                 // Save to disk
                 saveOfflineCacheToDisk()
                 
-                if forToday {
-                    // Filter for today's tasks
-                    let calendar = Calendar.current
-                    let today = calendar.startOfDay(for: Date())
-                    let dateFormatter = ISO8601DateFormatter()
-                    dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                // Process tasks to avoid duplicates between overdue and today's tasks
+                await MainActor.run {
+                    // Get the IDs of tasks that are already in the overdueTasks collection
+                    let overdueTaskIds = Set(self.overdueTasks.map { $0.id })
                     
-                    tasks = decodedTasks.filter { task in
-                        guard let dueDateString = task.dueDate,
-                              let dueDate = dateFormatter.date(from: dueDateString) else {
-                            return false
-                        }
+                    // Filter out tasks that are already in the overdueTasks collection
+                    let filteredTasks = decodedTasks.filter { !overdueTaskIds.contains($0.id) }
+                    
+                    if forToday {
+                        // Filter for today's tasks
+                        let calendar = Calendar.current
+                        let today = calendar.startOfDay(for: Date())
+                        let dateFormatter = ISO8601DateFormatter()
+                        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                         
-                        let taskDay = calendar.startOfDay(for: dueDate)
-                        return calendar.isDate(taskDay, inSameDayAs: today)
+                        self.tasks = filteredTasks.filter { task in
+                            guard let dueDateString = task.dueDate,
+                                  let dueDate = dateFormatter.date(from: dueDateString) else {
+                                return false
+                            }
+                            
+                            let taskDay = calendar.startOfDay(for: dueDate)
+                            return calendar.isDate(taskDay, inSameDayAs: today)
+                        }
+                    } else {
+                        self.tasks = filteredTasks
                     }
-                } else {
-                    tasks = decodedTasks
+                    
+                    self.lastFetchTime = Date()
+                    self.isLoading = false
                 }
-                
-                lastFetchTime = Date()
             } catch {
                 print("🌐 [Tasks] Error loading tasks: \(error.localizedDescription)")
                 
@@ -522,9 +532,17 @@ class TaskViewModel: ObservableObject {
             request.setValue("application/json", forHTTPHeaderField: "accept")
             APIConfig.addAuthHeaders(to: &request)
             
-            overdueTasks = try await executeRequest(request)
+            let fetchedOverdueTasks: [TodoTask] = try await executeRequest(request)
             
-            // Store in offline cache
+            // Get the IDs of tasks that are already in the regular tasks collection
+            let regularTaskIds = Set(tasks.map { $0.id })
+            
+            // Filter out tasks that are already in the regular tasks collection
+            let uniqueOverdueTasks = fetchedOverdueTasks.filter { !regularTaskIds.contains($0.id) }
+            
+            // Update the overdue tasks collection
+            overdueTasks = uniqueOverdueTasks
+            
             self.offlineOverdueTasksCache = overdueTasks
             self.lastSuccessfulSync = Date()
             self.isOfflineMode = false
@@ -582,6 +600,7 @@ class TaskViewModel: ObservableObject {
         // Load both task types concurrently
         do {
             try await withThrowingTaskGroup(of: Void.self) { group in
+                // First load overdue tasks
                 group.addTask {
                     do {
                         try await self.loadOverdueTasks()
@@ -591,16 +610,12 @@ class TaskViewModel: ObservableObject {
                     }
                 }
                 
-                group.addTask {
-                    do {
-                        try await self.loadTasks(forToday: true)
-                    } catch {
-                        print("🌐 [Tasks] Error in loadAllTasks (today): \(error.localizedDescription)")
-                        throw error
-                    }
-                }
-                
+                // Wait for overdue tasks to complete before loading regular tasks
+                // This ensures that the filtering in loadTasks can properly exclude overdue tasks
                 try await group.waitForAll()
+                
+                // Then load regular tasks
+                try await self.loadTasks(forToday: true)
             }
             print("🌐 [Tasks] Successfully loaded all tasks: \(tasks.count) today tasks, \(overdueTasks.count) overdue tasks")
         } catch {
