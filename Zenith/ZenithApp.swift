@@ -73,16 +73,22 @@ class KeyboardHeightHandler: ObservableObject {
         if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
            let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double {
             
-            // Add 1 point to avoid tiny gap
-            self.keyboardHeight = keyboardFrame.height + 1
-            self.animationDuration = duration
+            // Ensure UI updates happen on the main thread with high priority
+            DispatchQueue.main.async {
+                // Add 1 point to avoid tiny gap
+                self.keyboardHeight = keyboardFrame.height + 1
+                self.animationDuration = duration
+            }
         }
     }
     
     @objc private func keyboardWillHide(_ notification: Notification) {
         if let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double {
-            self.keyboardHeight = 0
-            self.animationDuration = duration
+            // Ensure UI updates happen on the main thread with high priority
+            DispatchQueue.main.async {
+                self.keyboardHeight = 0
+                self.animationDuration = duration
+            }
         }
     }
 }
@@ -315,10 +321,10 @@ struct ZenithApp: App {
                                 .offset(y: keyboardHandler.keyboardHeight > 0 ? geometry.size.height - keyboardHandler.keyboardHeight - 124 : 0)
                                 .animation(
                                     .interpolatingSpring(
-                                        mass: 0.8,  // Reduced mass for faster response
-                                        stiffness: 120,  // Increased stiffness
-                                        damping: 14.0,  // Slightly reduced damping
-                                        initialVelocity: 0.5  // Added initial velocity
+                                        mass: 0.6,  // Reduced mass for faster response
+                                        stiffness: 140,  // Increased stiffness
+                                        damping: 12.0,  // Slightly reduced damping
+                                        initialVelocity: 0
                                     ),
                                     value: keyboardHandler.keyboardHeight
                                 )

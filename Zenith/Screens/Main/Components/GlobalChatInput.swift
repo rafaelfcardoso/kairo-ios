@@ -25,7 +25,7 @@ class GlobalChatViewModel: ObservableObject {
         
         // Simplified keyboard handling with debouncing
         NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
-            .debounce(for: .milliseconds(10), scheduler: RunLoop.main)
+            .debounce(for: .milliseconds(50), scheduler: RunLoop.main) // Increased debounce time
             .receive(on: RunLoop.main) // Ensure updates happen on main thread
             .sink { [weak self] notification in
                 guard let self = self else { return }
@@ -41,7 +41,7 @@ class GlobalChatViewModel: ObservableObject {
             .store(in: &cancellables)
         
         NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
-            .debounce(for: .milliseconds(10), scheduler: RunLoop.main)
+            .debounce(for: .milliseconds(50), scheduler: RunLoop.main) // Increased debounce time
             .receive(on: RunLoop.main) // Ensure updates happen on main thread
             .sink { [weak self] notification in
                 guard let self = self else { return }
@@ -173,9 +173,14 @@ class GlobalChatViewModel: ObservableObject {
     
     // Method to dismiss keyboard
     func dismissKeyboard() {
-        isFocused = false
-        // Hide keyboard using UIKit
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        // Ensure we're on the main thread
+        Task { @MainActor in
+            isFocused = false
+            // Hide keyboard using UIKit
+            DispatchQueue.main.async {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
+        }
     }
 }
 
@@ -265,11 +270,16 @@ struct GlobalChatInput: View {
                                     .font(.subheadline)
                                     .focused($isFocused)
                                     .onChange(of: isFocused) { _, newValue in
-                                        viewModel.isFocused = newValue
-                                        
-                                        if newValue {
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                viewModel.isExpanded = true
+                                        // Ensure this runs on the main thread
+                                        Task { @MainActor in
+                                            viewModel.isFocused = newValue
+                                            
+                                            if newValue {
+                                                // Delay the animation slightly to avoid competing with keyboard animation
+                                                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                    viewModel.isExpanded = true
+                                                }
                                             }
                                         }
                                     }
@@ -277,6 +287,9 @@ struct GlobalChatInput: View {
                                     .onSubmit {
                                         viewModel.submitText()
                                     }
+                                    // Add this to improve keyboard responsiveness
+                                    .autocorrectionDisabled(true)
+                                    .textInputAutocapitalization(.never)
                             }
                         }
                         .frame(height: 36)
@@ -343,8 +356,11 @@ struct GlobalChatInput: View {
         .background(containerBackgroundColor)
         .clipShape(RoundedCorners(tl: 20, tr: 20, bl: 0, br: 0))
         .onTapGesture {
-            if !isFocused {
-                isFocused = true
+            // Ensure we're on the main thread and prioritize this action
+            DispatchQueue.main.async {
+                if !isFocused {
+                    isFocused = true
+                }
             }
         }
     }
