@@ -53,15 +53,15 @@ struct TaskRow: View {
             return nil
         }
         
-        let localDate = utcDate.addingTimeInterval(Double(TimeZone.current.secondsFromGMT()))
-        
+        // NOTE: We're using the DateFormatter's timeZone property to convert from UTC to local time.
+        // Do NOT manually adjust the date with addingTimeInterval as this would cause a double timezone adjustment.
         let timeFormatter = DateFormatter()
         timeFormatter.timeStyle = .short
         timeFormatter.dateStyle = .none
-        timeFormatter.timeZone = TimeZone.current
+        timeFormatter.timeZone = TimeZone.current  // This handles the UTC to local time conversion
         timeFormatter.locale = Locale.current
         
-        return timeFormatter.string(from: localDate)
+        return timeFormatter.string(from: utcDate)
     }
     
     private var formattedDate: String? {
@@ -78,7 +78,7 @@ struct TaskRow: View {
         }
         
         let dateFormatter = DateFormatter()
-        dateFormatter.timeZone = TimeZone.current
+        dateFormatter.timeZone = TimeZone.current  // This handles the UTC to local time conversion
         dateFormatter.locale = Locale(identifier: "pt_BR")
         dateFormatter.dateFormat = "d MMM"
         
@@ -152,6 +152,31 @@ struct TaskRow: View {
                 }
                 
                 HStack(spacing: 8) {
+                    // Display project first
+                    if task.project == nil {
+                        HStack(spacing: 4) {
+                            Image(systemName: "tray")
+                                .font(.system(size: 12))
+                                .foregroundColor(secondaryTextColor)
+                            Text("Entrada")
+                                .font(.caption)
+                                .foregroundColor(textColor)
+                        }
+                        .padding(.vertical, 4)
+                    } else if let project = task.project {
+                        HStack(spacing: 4) {
+                            // Use tray icon for Inbox project, folder.fill for others
+                            Image(systemName: project.isSystem ? "tray" : "folder.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(project.isSystem ? secondaryTextColor : Color(hex: project.color))
+                            Text(project.name)
+                                .font(.caption)
+                                .foregroundColor(textColor)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    
+                    // Then display time or date
                     if isOverdue, let date = formattedDate {
                         HStack(spacing: 4) {
                             Image(systemName: "calendar")
@@ -175,26 +200,8 @@ struct TaskRow: View {
                         .padding(.vertical, 4)
                         .foregroundColor(timeColor)
                     }
-                    
-                    if task.project == nil {
-                        HStack(spacing: 4) {
-                            Image(systemName: "tray")
-                                .font(.system(size: 12))
-                            Text("Entrada")
-                                .font(.caption)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .foregroundColor(secondaryTextColor)
-                    } else if let project = task.project {
-                        Text(project.name)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(hex: project.color).opacity(0.2))
-                            .cornerRadius(4)
-                    }
                 }
+                .padding(.top, 4)
                 .opacity(isCompleting ? 0.5 : 1)
             }
             
