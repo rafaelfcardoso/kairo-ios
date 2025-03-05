@@ -15,6 +15,8 @@ struct TodoTask: Identifiable, Codable {
     let project: Project?
     let tags: [Tag]
     let focusSessions: [FocusSession]
+    let isRecurring: Bool?
+    let needsReminder: Bool?
 }
 
 // Since the API shows empty arrays for tags and focusSessions, 

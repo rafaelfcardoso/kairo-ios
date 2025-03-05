@@ -9,6 +9,7 @@ struct TaskSectionView: View {
     let onTaskCreated: @Sendable () async -> Void
     @StateObject var viewModel: TaskViewModel
     @Binding var showingCreateTask: Bool
+    var selectedFilterName: String? = nil
     
     var body: some View {
         if tasks.isEmpty {
@@ -49,11 +50,17 @@ struct TaskSectionView: View {
         } else {
             // Regular content with tasks
             VStack(alignment: .leading, spacing: 16) {
-                Text(title)
-                    .font(.title2)
-                    .bold()
-                    .padding(.horizontal)
-                    .padding(.top)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Text(tasks.count == 1 ? "1 tarefa" : "\(tasks.count) tarefas")
+                        .font(.subheadline)
+                        .foregroundColor(secondaryTextColor)
+                }
+                .padding(.horizontal)
+                .padding(.top)
                 
                 TaskListView(
                     showingCreateTask: $showingCreateTask,
@@ -63,7 +70,8 @@ struct TaskSectionView: View {
                     onTaskCreated: { @Sendable in
                         await onTaskCreated()
                     },
-                    viewModel: viewModel
+                    viewModel: viewModel,
+                    isOverdueSection: selectedFilterName == "Atrasadas"
                 )
             }
         }

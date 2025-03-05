@@ -19,14 +19,12 @@ class ProjectViewModel: ObservableObject {
     private func executeRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
+            
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw APIError.invalidResponse
             }
             
             print("📂 [Projects] Response status: \(httpResponse.statusCode)")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("📂 [Projects] Response body: \(responseString)")
-            }
             
             try APIConfig.handleAPIResponse(data, httpResponse)
             return try JSONDecoder().decode(T.self, from: data)
@@ -44,9 +42,6 @@ class ProjectViewModel: ObservableObject {
                 }
                 
                 print("📂 [Projects] Retry response status: \(httpResponse.statusCode)")
-                if let responseString = String(data: retryData, encoding: .utf8) {
-                    print("📂 [Projects] Retry response body: \(responseString)")
-                }
                 
                 try APIConfig.handleAPIResponse(retryData, httpResponse)
                 return try JSONDecoder().decode(T.self, from: retryData)
