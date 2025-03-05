@@ -53,15 +53,15 @@ struct TaskRow: View {
             return nil
         }
         
-        let localDate = utcDate.addingTimeInterval(Double(TimeZone.current.secondsFromGMT()))
-        
+        // NOTE: We're using the DateFormatter's timeZone property to convert from UTC to local time.
+        // Do NOT manually adjust the date with addingTimeInterval as this would cause a double timezone adjustment.
         let timeFormatter = DateFormatter()
         timeFormatter.timeStyle = .short
         timeFormatter.dateStyle = .none
-        timeFormatter.timeZone = TimeZone.current
+        timeFormatter.timeZone = TimeZone.current  // This handles the UTC to local time conversion
         timeFormatter.locale = Locale.current
         
-        return timeFormatter.string(from: localDate)
+        return timeFormatter.string(from: utcDate)
     }
     
     private var formattedDate: String? {
@@ -78,7 +78,7 @@ struct TaskRow: View {
         }
         
         let dateFormatter = DateFormatter()
-        dateFormatter.timeZone = TimeZone.current
+        dateFormatter.timeZone = TimeZone.current  // This handles the UTC to local time conversion
         dateFormatter.locale = Locale(identifier: "pt_BR")
         dateFormatter.dateFormat = "d MMM"
         
@@ -152,49 +152,88 @@ struct TaskRow: View {
                 }
                 
                 HStack(spacing: 8) {
-                    if isOverdue, let date = formattedDate {
-                        HStack(spacing: 4) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 12))
-                            Text(date)
-                                .font(.caption)
-                            if let time = formattedTime {
+                    // First row of metadata with flexible wrapping
+                    VStack(alignment: .leading, spacing: 4) {
+                        // First display deadline/time
+                        if isOverdue, let date = formattedDate {
+                            HStack(spacing: 4) {
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 12))
+                                Text("\(date) \(formattedTime ?? "")")
+                                    .font(.caption)
+                            }
+                            .padding(.vertical, 4)
+                            .foregroundColor(timeColor)
+                        } else if let time = formattedTime {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock")
+                                    .font(.system(size: 12))
                                 Text(time)
                                     .font(.caption)
                             }
-                        }
-                        .padding(.vertical, 4)
-                        .foregroundColor(timeColor)
-                    } else if let time = formattedTime {
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .font(.system(size: 12))
-                            Text(time)
-                                .font(.caption)
-                        }
-                        .padding(.vertical, 4)
-                        .foregroundColor(timeColor)
-                    }
-                    
-                    if task.project == nil {
-                        HStack(spacing: 4) {
-                            Image(systemName: "tray")
-                                .font(.system(size: 12))
-                            Text("Entrada")
-                                .font(.caption)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .foregroundColor(secondaryTextColor)
-                    } else if let project = task.project {
-                        Text(project.name)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color(hex: project.color).opacity(0.2))
-                            .cornerRadius(4)
+                            .foregroundColor(timeColor)
+                        }
+                        
+                        // Second row with wrapping HStack for remaining metadata
+                        HStack(spacing: 8) {
+                            // Display recurrence icon if task is recurring
+                            if let isRecurring = task.isRecurring, isRecurring {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(secondaryTextColor)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            
+                            // Display reminder icon if task needs reminder
+                            if let needsReminder = task.needsReminder, needsReminder {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "alarm")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(secondaryTextColor)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            
+                            // Display tags if any
+                            if !task.tags.isEmpty {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "tag")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(secondaryTextColor)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            
+                            // Display project last
+                            if task.project == nil {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "tray")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(secondaryTextColor)
+                                    Text("Entrada")
+                                        .font(.caption)
+                                        .foregroundColor(textColor)
+                                }
+                                .padding(.vertical, 4)
+                            } else if let project = task.project {
+                                HStack(spacing: 4) {
+                                    // Use tray icon for Inbox project, folder.fill for others
+                                    Image(systemName: project.isSystem ? "tray" : "folder.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(project.isSystem ? secondaryTextColor : Color(hex: project.color))
+                                    Text(project.name)
+                                        .font(.caption)
+                                        .foregroundColor(textColor)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
                     }
                 }
+                .padding(.top, 4)
                 .opacity(isCompleting ? 0.5 : 1)
             }
             

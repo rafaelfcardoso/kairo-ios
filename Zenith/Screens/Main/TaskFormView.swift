@@ -441,7 +441,9 @@ struct TaskFormView: View {
                 "title": taskTitle,
                 "description": taskDescription,
                 "priority": selectedPriority?.rawValue ?? "none",
-                "projectId": selectedProject?.id ?? inboxProjectId
+                "projectId": selectedProject?.id ?? inboxProjectId,
+                "isRecurring": false,
+                "needsReminder": false
             ]
             
             let dateFormatter = ISO8601DateFormatter()
@@ -797,7 +799,9 @@ struct TaskFormView_Previews: PreviewProvider {
                 updatedAt: "",
                 project: nil,
                 tags: [],
-                focusSessions: []
+                focusSessions: [],
+                isRecurring: false,
+                needsReminder: false
             ),
             viewModel: TaskViewModel()
         ) {

@@ -23,213 +23,205 @@ struct SidebarMenu: View {
     }
     
     var body: some View {
-        ZStack(alignment: .leading) {
-            // Semi-transparent overlay for the rest of the screen
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        HapticManager.shared.impact(style: .light)
-                        isShowingSidebar = false
-                    }
+        // Only the sidebar content, without the overlay background
+        // (The overlay is now handled in ZenithApp.swift)
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // Get accurate status bar height
+                Color.clear
+                    .frame(height: 0)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .preference(key: SafeAreaInsetKey.self, value: geo.safeAreaInsets)
+                                .onAppear {
+                                    let keyWindow = UIApplication.shared.connectedScenes
+                                        .filter { $0.activationState == .foregroundActive }
+                                        .compactMap { $0 as? UIWindowScene }
+                                        .first?.windows
+                                        .filter { $0.isKeyWindow }.first
+                                    statusBarHeight = keyWindow?.safeAreaInsets.top ?? 47
+                                }
+                        }
+                    )
+                
+                // Status bar spacer - using accurate height
+                Color.clear
+                    .frame(height: statusBarHeight)
+                
+                // Search bar
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(secondaryTextColor)
+                    
+                    Text("Pesquisar")
+                        .foregroundColor(secondaryTextColor)
+                    
+                    Spacer()
                 }
-            
-            // Sidebar content - attached to the left edge
-            GeometryReader { geometry in
-                VStack(spacing: 0) {
-                    // Get accurate status bar height
-                    Color.clear
-                        .frame(height: 0)
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear
-                                    .preference(key: SafeAreaInsetKey.self, value: geo.safeAreaInsets)
-                                    .onAppear {
-                                        let keyWindow = UIApplication.shared.connectedScenes
-                                            .filter { $0.activationState == .foregroundActive }
-                                            .compactMap { $0 as? UIWindowScene }
-                                            .first?.windows
-                                            .filter { $0.isKeyWindow }.first
-                                        statusBarHeight = keyWindow?.safeAreaInsets.top ?? 47
-                                    }
-                            }
-                        )
-                    
-                    // Status bar spacer - using accurate height
-                    Color.clear
-                        .frame(height: statusBarHeight)
-                    
-                    // Search bar
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(secondaryTextColor)
-                        
-                        Text("Pesquisar")
-                            .foregroundColor(secondaryTextColor)
-                        
-                        Spacer()
-                    }
-                    .padding()
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(10)
-                    .padding(.horizontal)
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(10)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                
+                // Divider
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 1)
                     .padding(.vertical, 8)
-                    
-                    // Divider
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 1)
-                        .padding(.vertical, 8)
-                    
-                    // Menu items
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            // Home view (main page)
+                
+                // Menu items
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Home view (main page)
+                        menuItem(
+                            icon: "filemenu.and.selection",
+                            title: "Hoje",
+                            count: taskViewModel.tasks.count + taskViewModel.overdueTasks.count,
+                            isSelected: selectedProject == nil
+                        ) {
+                            selectedProject = nil
+                            withAnimation {
+                                isShowingSidebar = false
+                            }
+                        }
+                        
+                        // Inbox
+                        if let inboxProject = projectViewModel.projects.first(where: { $0.isSystem }) {
                             menuItem(
-                                icon: "filemenu.and.selection",
-                                title: "Hoje",
-                                count: taskViewModel.tasks.count + taskViewModel.overdueTasks.count,
-                                isSelected: selectedProject == nil
+                                icon: "tray",
+                                title: "Entrada",
+                                count: inboxProject.taskCount ?? 0,
+                                isSelected: selectedProject?.id == inboxProject.id
                             ) {
-                                selectedProject = nil
+                                selectedProject = inboxProject
                                 withAnimation {
                                     isShowingSidebar = false
                                 }
                             }
+                        }
+                        
+                        // Projects section header
+                        HStack {
+                            Text("PROJETOS")
+                                .font(.footnote)
+                                .fontWeight(.semibold)
+                                .foregroundColor(secondaryTextColor)
                             
-                            // Inbox
-                            if let inboxProject = projectViewModel.projects.first(where: { $0.isSystem }) {
+                            Spacer()
+                            
+                            Button {
+                                showingCreateProject = true
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.footnote)
+                                    .foregroundColor(secondaryTextColor)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
+                        
+                        // Projects list
+                        if projectViewModel.isLoading {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                Spacer()
+                            }
+                            .padding()
+                        } else if projectViewModel.hasError {
+                            VStack {
+                                Spacer()
+                                
+                                VStack(spacing: 8) {
+                                    Image(systemName: "wifi.slash")
+                                        .font(.system(size: 30))
+                                        .foregroundColor(secondaryTextColor)
+                                    
+                                    Text("Não foi possível carregar")
+                                        .font(.subheadline)
+                                        .foregroundColor(secondaryTextColor)
+                                        .multilineTextAlignment(.center)
+                                    
+                                    Button("Tentar novamente") {
+                                        loadProjects(forceRefresh: true)
+                                    }
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                                    .padding(.top, 4)
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                
+                                Spacer()
+                            }
+                        } else {
+                            ForEach(projectViewModel.projects.filter { !$0.isSystem }) { project in
                                 menuItem(
-                                    icon: "tray",
-                                    title: "Entrada",
-                                    count: inboxProject.taskCount ?? 0,
-                                    isSelected: selectedProject?.id == inboxProject.id
+                                    icon: "folder.fill",
+                                    title: project.name,
+                                    count: project.taskCount ?? 0,
+                                    iconColor: Color(hex: project.color),
+                                    isSelected: selectedProject?.id == project.id
                                 ) {
-                                    selectedProject = inboxProject
+                                    selectedProject = project
                                     withAnimation {
                                         isShowingSidebar = false
                                     }
                                 }
                             }
-                            
-                            // Projects section header
-                            HStack {
-                                Text("PROJETOS")
-                                    .font(.footnote)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(secondaryTextColor)
-                                
-                                Spacer()
-                                
-                                Button {
-                                    showingCreateProject = true
-                                } label: {
-                                    Image(systemName: "plus")
-                                        .font(.footnote)
-                                        .foregroundColor(secondaryTextColor)
-                                }
-                            }
-                            .padding(.horizontal)
-                            .padding(.top, 16)
-                            .padding(.bottom, 8)
-                            
-                            // Projects list
-                            if projectViewModel.isLoading {
-                                HStack {
-                                    Spacer()
-                                    ProgressView()
-                                    Spacer()
-                                }
-                                .padding()
-                            } else if projectViewModel.hasError {
-                                HStack {
-                                    Spacer()
-                                    
-                                    VStack(spacing: 8) {
-                                        Image(systemName: "wifi.slash")
-                                            .foregroundColor(secondaryTextColor)
-                                        
-                                        Text("Não foi possível carregar")
-                                            .font(.caption)
-                                            .foregroundColor(secondaryTextColor)
-                                            .multilineTextAlignment(.center)
-                                        
-                                        Button("Tentar novamente") {
-                                            loadProjects(forceRefresh: true)
-                                        }
-                                        .font(.caption)
-                                        .foregroundColor(.blue)
-                                    }
-                                    
-                                    Spacer()
-                                }
-                                .padding()
-                            } else {
-                                ForEach(projectViewModel.projects.filter { !$0.isSystem }) { project in
-                                    menuItem(
-                                        icon: "folder.fill",
-                                        title: project.name,
-                                        count: project.taskCount ?? 0,
-                                        iconColor: Color(hex: project.color),
-                                        isSelected: selectedProject?.id == project.id
-                                    ) {
-                                        selectedProject = project
-                                        withAnimation {
-                                            isShowingSidebar = false
-                                        }
-                                    }
-                                }
-                            }
                         }
-                        .padding(.vertical, 8)
                     }
-                    
-                    Spacer()
-                    
-                    // User profile and settings at the bottom
-                    VStack(spacing: 0) {
-                        // Divider before user section
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(height: 1)
-                            .padding(.bottom, 16)
-                        
-                        // User profile and settings
-                        HStack {
-                            // User avatar
-                            Circle()
-                                .fill(Color.gray.opacity(0.3))
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Image(systemName: "person.fill")
-                                        .foregroundColor(secondaryTextColor)
-                                )
-                            
-                            Text("Rafael Cardoso")
-                                .font(.headline)
-                                .foregroundColor(textColor)
-                            
-                            Spacer()
-                            
-                            // Settings button
-                            Button {
-                                // Settings action will be implemented later
-                            } label: {
-                                Image(systemName: "gearshape.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(secondaryTextColor)
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.bottom, 24)
-                    }
+                    .padding(.vertical, 8)
                 }
-                .frame(width: min(geometry.size.width * 0.85, 350))
-                .background(backgroundColor)
-                .ignoresSafeArea()
+                
+                Spacer()
+                
+                // User profile and settings at the bottom
+                VStack(spacing: 0) {
+                    // Divider before user section
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 1)
+                        .padding(.bottom, 16)
+                    
+                    // User profile and settings
+                    HStack {
+                        // User avatar
+                        Circle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Image(systemName: "person.fill")
+                                    .foregroundColor(secondaryTextColor)
+                            )
+                        
+                        Text("Rafael Cardoso")
+                            .font(.headline)
+                            .foregroundColor(textColor)
+                        
+                        Spacer()
+                        
+                        // Settings button
+                        Button {
+                            // Settings action will be implemented later
+                        } label: {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(secondaryTextColor)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 24)
+                }
             }
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.85)
+            .frame(width: min(geometry.size.width * 0.85, 350))
+            .background(backgroundColor)
+            .ignoresSafeArea()
         }
+        .frame(maxWidth: UIScreen.main.bounds.width * 0.85)
         .sheet(isPresented: $showingCreateProject) {
             CreateProjectView(viewModel: projectViewModel)
                 .presentationDetents([.medium])

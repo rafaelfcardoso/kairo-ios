@@ -19,14 +19,12 @@ class ProjectViewModel: ObservableObject {
     private func executeRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
+            
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw APIError.invalidResponse
             }
             
             print("📂 [Projects] Response status: \(httpResponse.statusCode)")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("📂 [Projects] Response body: \(responseString)")
-            }
             
             try APIConfig.handleAPIResponse(data, httpResponse)
             return try JSONDecoder().decode(T.self, from: data)
@@ -44,9 +42,6 @@ class ProjectViewModel: ObservableObject {
                 }
                 
                 print("📂 [Projects] Retry response status: \(httpResponse.statusCode)")
-                if let responseString = String(data: retryData, encoding: .utf8) {
-                    print("📂 [Projects] Retry response body: \(responseString)")
-                }
                 
                 try APIConfig.handleAPIResponse(retryData, httpResponse)
                 return try JSONDecoder().decode(T.self, from: retryData)
@@ -93,6 +88,11 @@ class ProjectViewModel: ObservableObject {
         hasError = false
         
         do {
+            // First try to load from local storage as a fallback
+            if projects.isEmpty {
+                loadCachedProjects()
+            }
+            
             // Check if a refresh is needed based on cache conditions
             let shouldRefresh = forceRefresh || 
                                projects.isEmpty || 
@@ -105,38 +105,61 @@ class ProjectViewModel: ObservableObject {
                 return
             }
             
-            // First try to load from local storage as a fallback
-            if projects.isEmpty {
-                loadCachedProjects()
+            // Set a timeout for the network request
+            let networkTask = Task {
+                print("📂 [Projects] Loading projects from API...")
+                let endpointURL = try APIConfig.getEndpointURL("/projects")
+                var urlComponents = URLComponents(string: endpointURL)!
+                
+                urlComponents.queryItems = [
+                    URLQueryItem(name: "includeSystem", value: "true")
+                ]
+                
+                guard let url = urlComponents.url else {
+                    throw APIError.invalidURL(urlComponents.description)
+                }
+                
+                var request = URLRequest(url: url)
+                request.timeoutInterval = 5.0 // 5 second timeout
+                request.setValue("application/json", forHTTPHeaderField: "accept")
+                APIConfig.addAuthHeaders(to: &request)
+                
+                let decodedProjects: [Project] = try await executeRequest(request)
+                print("📂 [Projects] Loaded \(decodedProjects.count) projects")
+                print("📂 [Projects] System projects: \(decodedProjects.filter { $0.isSystem }.count)")
+                
+                // Update the state
+                projects = decodedProjects
+                lastFetchTime = Date()
+                isInitialLoadDone = true
+                
+                // Cache the projects locally
+                saveProjectsToCache(decodedProjects)
+                
+                return decodedProjects
             }
             
-            print("📂 [Projects] Loading projects from API...")
-            let endpointURL = try APIConfig.getEndpointURL("/projects")
-            var urlComponents = URLComponents(string: endpointURL)!
-            
-            urlComponents.queryItems = [
-                URLQueryItem(name: "includeSystem", value: "true")
-            ]
-            
-            guard let url = urlComponents.url else {
-                throw APIError.invalidURL(urlComponents.description)
+            // Set a timeout task
+            let timeoutTask = Task {
+                try await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                networkTask.cancel()
             }
             
-            var request = URLRequest(url: url)
-            request.setValue("application/json", forHTTPHeaderField: "accept")
-            APIConfig.addAuthHeaders(to: &request)
-            
-            let decodedProjects: [Project] = try await executeRequest(request)
-            print("📂 [Projects] Loaded \(decodedProjects.count) projects")
-            print("📂 [Projects] System projects: \(decodedProjects.filter { $0.isSystem }.count)")
-            
-            // Update the state
-            projects = decodedProjects
-            lastFetchTime = Date()
-            isInitialLoadDone = true
-            
-            // Cache the projects locally
-            saveProjectsToCache(decodedProjects)
+            do {
+                _ = try await networkTask.value
+                timeoutTask.cancel()
+            } catch {
+                timeoutTask.cancel()
+                
+                // If this was the first load attempt and we have cached data, keep using that
+                if !isInitialLoadDone && !projects.isEmpty {
+                    // We already loaded from cache, so just set loading to false
+                    print("📂 [Projects] Falling back to cached projects due to error")
+                    isInitialLoadDone = true
+                } else {
+                    throw error
+                }
+            }
             
             isLoading = false
         } catch {
@@ -144,14 +167,12 @@ class ProjectViewModel: ObservableObject {
             isLoading = false
             hasError = true
             
-            // If this was the first load attempt and we have cached data, keep using that
-            if !isInitialLoadDone && !projects.isEmpty {
-                // We already loaded from cache, so just set loading to false
-                print("📂 [Projects] Falling back to cached projects due to error")
-                isInitialLoadDone = true
+            // If we have cached data, don't propagate the error
+            if !projects.isEmpty {
+                print("📂 [Projects] Using cached projects despite error")
+            } else {
+                throw error
             }
-            
-            throw error
         }
     }
     
