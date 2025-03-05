@@ -321,9 +321,8 @@ class FocusSessionViewModel: ObservableObject {
             }
             
             print("🎯 [Focus] Response Status: \(httpResponse.statusCode)")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("🎯 [Focus] Response Body: \(responseString)")
-            }
+            // Check if response has valid string data without assigning to unused variable
+            _ = String(data: data, encoding: .utf8) != nil
             
             guard (200...299).contains(httpResponse.statusCode) else {
                 if httpResponse.statusCode == 401 {
@@ -407,9 +406,8 @@ class FocusSessionViewModel: ObservableObject {
             }
             
             print("🎯 [Focus] Forfeit Session Response Status: \(httpResponse.statusCode)")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("🎯 [Focus] Forfeit Session Response Body: \(responseString)")
-            }
+            // Check if response has valid string data without assigning to unused variable
+            _ = String(data: data, encoding: .utf8) != nil
             
             guard (200...299).contains(httpResponse.statusCode) else {
                 print("🎯 [Focus] Forfeit failed with status code: \(httpResponse.statusCode)")
@@ -606,9 +604,8 @@ class FocusSessionViewModel: ObservableObject {
             }
             
             print("🎯 [Focus] Complete Session Response Status: \(httpResponse.statusCode)")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("🎯 [Focus] Complete Session Response Body: \(responseString)")
-            }
+            // Check if response has valid string data without assigning to unused variable
+            _ = String(data: data, encoding: .utf8) != nil
             
             guard (200...299).contains(httpResponse.statusCode) else {
                 print("🎯 [Focus] Complete failed with status code: \(httpResponse.statusCode)")

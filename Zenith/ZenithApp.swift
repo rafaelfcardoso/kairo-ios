@@ -206,7 +206,7 @@ struct CustomTabBar: View {
                     .frame(width: 44, height: 44)
                     .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
                 
-                Image(systemName: "play.fill")
+                Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundColor(colorScheme == .dark ? .black : .white)
             }

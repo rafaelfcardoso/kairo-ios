@@ -67,15 +67,6 @@ struct ErrorView: View {
     }
 }
 
-// Add this enum after the ErrorView struct
-enum TaskFilter: String, CaseIterable {
-    case today = "Hoje"
-    case upcoming = "Próximas"
-    case inbox = "Entrada"
-    case completed = "Concluídas"
-    case focus = "Foco"
-}
-
 struct MainView: View {
     @EnvironmentObject var viewModel: TaskViewModel
     @EnvironmentObject var projectViewModel: ProjectViewModel
@@ -88,7 +79,7 @@ struct MainView: View {
     @State private var navigationPath = NavigationPath()
     @Environment(\.colorScheme) var colorScheme
     @EnvironmentObject var focusSessionViewModel: FocusSessionViewModel
-    @State private var selectedTaskFilter: TaskFilter = .today
+    @State private var selectedFilterName: String = "Hoje"
     
     // Use app-level binding for selected project
     @Binding var selectedProject: Project?
@@ -133,18 +124,20 @@ struct MainView: View {
         if let project = selectedProject {
             return viewModel.getTasksForProject(projectId: project.id)
         } else {
-            // Return tasks based on selected filter
-            switch selectedTaskFilter {
-            case .today:
+            // Return tasks based on selected filter name
+            switch selectedFilterName {
+            case "Hoje":
                 return viewModel.todayTasks
-            case .upcoming:
+            case "Próximas":
                 return viewModel.upcomingTasks
-            case .inbox:
+            case "Entrada":
                 return viewModel.inboxTasks
-            case .completed:
+            case "Concluídas":
                 return viewModel.completedTasks
-            case .focus:
+            case "Foco":
                 return viewModel.focusTasks
+            default:
+                return viewModel.todayTasks
             }
         }
     }
@@ -299,25 +292,13 @@ struct MainView: View {
     
     private var titleView: some View {
         VStack(spacing: 2) {
-            if let selectedProject = selectedProject {
-                Text(selectedProject.name)
-                    .font(.headline)
-                    .foregroundColor(textColor)
-            } else {
-                Text(selectedTaskFilter.rawValue.capitalized)
-                    .font(.headline)
-                    .foregroundColor(textColor)
-            }
+            Text(viewModel.greeting)
+                .font(.headline)
+                .foregroundColor(textColor)
             
-            if let selectedProject = selectedProject {
-                Text("\(viewModel.getTasksForProject(projectId: selectedProject.id).count) tasks")
-                    .font(.subheadline)
-                    .foregroundColor(secondaryTextColor)
-            } else {
-                Text("\(displayedTasks.count) tasks")
-                    .font(.subheadline)
-                    .foregroundColor(secondaryTextColor)
-            }
+            Text(viewModel.formattedDate)
+                .font(.subheadline)
+                .foregroundColor(secondaryTextColor)
         }
     }
     
@@ -388,90 +369,6 @@ struct MainView: View {
         }
         
         isLoading = false
-    }
-}
-
-// Add this new view component after MainView
-struct TaskContentView: View {
-    @Binding var selectedProject: Project?
-    @Binding var selectedTab: Int
-    @ObservedObject var viewModel: TaskViewModel
-    @Binding var showingCreateTask: Bool
-    let secondaryTextColor: Color
-    let cardBackgroundColor: Color
-    let displayedTasks: [TodoTask]
-    let onLoadTasks: @Sendable () async -> Void
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            if selectedProject == nil && !viewModel.overdueTasks.isEmpty {
-                TabView(selection: $selectedTab) {
-                    // Overdue Section
-                    TaskSectionView(
-                        title: "Atrasadas",
-                        tasks: viewModel.overdueTasks,
-                        secondaryTextColor: secondaryTextColor,
-                        cardBackgroundColor: cardBackgroundColor,
-                        onTaskCreated: { @Sendable in
-                            await handleTaskCreation()
-                        },
-                        viewModel: viewModel,
-                        showingCreateTask: $showingCreateTask
-                    )
-                    .tag(0)
-                    .refreshable {
-                        await handleRefresh()
-                    }
-                    
-                    // Today Section
-                    TaskSectionView(
-                        title: "Hoje",
-                        tasks: viewModel.tasks,
-                        secondaryTextColor: secondaryTextColor,
-                        cardBackgroundColor: cardBackgroundColor,
-                        onTaskCreated: { @Sendable in
-                            await handleTaskCreation()
-                        },
-                        viewModel: viewModel,
-                        showingCreateTask: $showingCreateTask
-                    )
-                    .tag(1)
-                    .refreshable {
-                        await handleRefresh()
-                    }
-                }
-                .tabViewStyle(.page)
-                .indexViewStyle(.page(backgroundDisplayMode: .always))
-            } else {
-                TaskSectionView(
-                    title: selectedProject?.name ?? "Hoje",
-                    tasks: displayedTasks,
-                    secondaryTextColor: secondaryTextColor,
-                    cardBackgroundColor: cardBackgroundColor,
-                    onTaskCreated: { @Sendable in
-                        await handleTaskCreation()
-                    },
-                    viewModel: viewModel,
-                    showingCreateTask: $showingCreateTask
-                )
-                .refreshable {
-                    await handleRefresh()
-                }
-            }
-        }
-    }
-    
-    // Helper functions to reduce repetitive code
-    @Sendable
-    private func handleTaskCreation() async {
-        await onLoadTasks()
-    }
-    
-    @Sendable
-    private func handleRefresh() async {
-        await onLoadTasks()
-        // Adding a small delay to make the refresh indicator visible
-        try? await Task.sleep(nanoseconds: 500_000_000)
     }
 }
 

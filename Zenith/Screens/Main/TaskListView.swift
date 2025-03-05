@@ -9,12 +9,13 @@ struct TaskListView: View {
     let onTaskCreated: @Sendable () async -> Void
     let viewModel: TaskViewModel
     @State private var shouldRefresh = false
+    var isOverdueSection: Bool = false
     
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
                 ForEach(tasks) { task in
-                    TaskRow(task: task, viewModel: viewModel, isOverdue: false)
+                    TaskRow(task: task, viewModel: viewModel, isOverdue: isOverdueSection)
                 }
                 
                 Button(action: {

@@ -64,7 +64,7 @@ enum APIConfig {
     static let serviceKey = "2469ab5d2f05509a8c2e28b422cdc8b5ebebc037cb27cfc7071818fa172464b2"
     private static var authToken: String?
     
-    static var isDebugLoggingEnabled = true
+    static var isDebugLoggingEnabled = false
     
     private static func logDebug(_ message: String) {
         if isDebugLoggingEnabled {

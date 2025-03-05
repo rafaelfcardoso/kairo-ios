@@ -152,53 +152,85 @@ struct TaskRow: View {
                 }
                 
                 HStack(spacing: 8) {
-                    // Display project first
-                    if task.project == nil {
-                        HStack(spacing: 4) {
-                            Image(systemName: "tray")
-                                .font(.system(size: 12))
-                                .foregroundColor(secondaryTextColor)
-                            Text("Entrada")
-                                .font(.caption)
-                                .foregroundColor(textColor)
-                        }
-                        .padding(.vertical, 4)
-                    } else if let project = task.project {
-                        HStack(spacing: 4) {
-                            // Use tray icon for Inbox project, folder.fill for others
-                            Image(systemName: project.isSystem ? "tray" : "folder.fill")
-                                .font(.system(size: 12))
-                                .foregroundColor(project.isSystem ? secondaryTextColor : Color(hex: project.color))
-                            Text(project.name)
-                                .font(.caption)
-                                .foregroundColor(textColor)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    
-                    // Then display time or date
-                    if isOverdue, let date = formattedDate {
-                        HStack(spacing: 4) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 12))
-                            Text(date)
-                                .font(.caption)
-                            if let time = formattedTime {
+                    // First row of metadata with flexible wrapping
+                    VStack(alignment: .leading, spacing: 4) {
+                        // First display deadline/time
+                        if isOverdue, let date = formattedDate {
+                            HStack(spacing: 4) {
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 12))
+                                Text("\(date) \(formattedTime ?? "")")
+                                    .font(.caption)
+                            }
+                            .padding(.vertical, 4)
+                            .foregroundColor(timeColor)
+                        } else if let time = formattedTime {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock")
+                                    .font(.system(size: 12))
                                 Text(time)
                                     .font(.caption)
                             }
+                            .padding(.vertical, 4)
+                            .foregroundColor(timeColor)
                         }
-                        .padding(.vertical, 4)
-                        .foregroundColor(timeColor)
-                    } else if let time = formattedTime {
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .font(.system(size: 12))
-                            Text(time)
-                                .font(.caption)
+                        
+                        // Second row with wrapping HStack for remaining metadata
+                        HStack(spacing: 8) {
+                            // Display recurrence icon if task is recurring
+                            if let isRecurring = task.isRecurring, isRecurring {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(secondaryTextColor)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            
+                            // Display reminder icon if task needs reminder
+                            if let needsReminder = task.needsReminder, needsReminder {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "alarm")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(secondaryTextColor)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            
+                            // Display tags if any
+                            if !task.tags.isEmpty {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "tag")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(secondaryTextColor)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            
+                            // Display project last
+                            if task.project == nil {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "tray")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(secondaryTextColor)
+                                    Text("Entrada")
+                                        .font(.caption)
+                                        .foregroundColor(textColor)
+                                }
+                                .padding(.vertical, 4)
+                            } else if let project = task.project {
+                                HStack(spacing: 4) {
+                                    // Use tray icon for Inbox project, folder.fill for others
+                                    Image(systemName: project.isSystem ? "tray" : "folder.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(project.isSystem ? secondaryTextColor : Color(hex: project.color))
+                                    Text(project.name)
+                                        .font(.caption)
+                                        .foregroundColor(textColor)
+                                }
+                                .padding(.vertical, 4)
+                            }
                         }
-                        .padding(.vertical, 4)
-                        .foregroundColor(timeColor)
                     }
                 }
                 .padding(.top, 4)
