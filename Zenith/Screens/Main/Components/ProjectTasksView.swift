@@ -7,6 +7,7 @@ struct ProjectTasksView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isLoading = true
     @State private var hasError = false
+    @State private var errorMessage: String? = nil
     @State private var projectTasks: [TodoTask] = []
     @State private var showingCreateTask = false
     
@@ -30,61 +31,134 @@ struct ProjectTasksView: View {
         ZStack {
             backgroundColor.ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                if isLoading {
-                    ProgressView()
-                } else if hasError {
-                    ErrorView(
-                        secondaryTextColor: secondaryTextColor,
-                        textColor: textColor,
-                        retryAction: loadProjectTasks
-                    )
-                } else if projectTasks.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "folder.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(Color(hex: project.color))
-                        
-                        Text("Nenhuma tarefa")
-                            .font(.headline)
-                            .foregroundColor(textColor)
-                        
-                        Text("Este projeto ainda não possui tarefas")
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if hasError && !taskViewModel.isOfflineMode {
+                ErrorView(
+                    secondaryTextColor: secondaryTextColor,
+                    textColor: textColor,
+                    retryAction: loadProjectTasks,
+                    errorMessage: errorMessage
+                )
+            } else if taskViewModel.isOfflineMode {
+                VStack(spacing: 0) {
+                    // Offline banner
+                    HStack {
+                        Image(systemName: "wifi.slash")
+                            .foregroundColor(secondaryTextColor)
+                        Text("Modo Offline")
                             .font(.subheadline)
                             .foregroundColor(secondaryTextColor)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                        
-                        Button {
-                            showingCreateTask = true
-                        } label: {
-                            Text("Criar tarefa")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(Color.blue)
-                                .cornerRadius(8)
+                        Spacer()
+                        Button("Reconectar") {
+                            loadProjectTasks()
                         }
-                        .padding(.top, 8)
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
                     }
-                    .padding()
-                } else {
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(projectTasks) { task in
-                                TaskRow(
-                                    task: task,
-                                    viewModel: taskViewModel,
-                                    isOverdue: false
-                                )
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+                    .padding(.horizontal)
+                    .padding(.top)
+                    
+                    if projectTasks.isEmpty {
+                        VStack(spacing: 16) {
+                            Spacer()
+                            Image(systemName: "folder.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(Color(hex: project.color))
+                            
+                            Text("Nenhuma tarefa")
+                                .font(.headline)
+                                .foregroundColor(textColor)
+                            
+                            Text("Este projeto ainda não possui tarefas")
+                                .font(.subheadline)
+                                .foregroundColor(secondaryTextColor)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                            
+                            Button {
+                                showingCreateTask = true
+                            } label: {
+                                Text("Criar tarefa")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 10)
+                                    .background(Color.blue)
+                                    .cornerRadius(8)
                             }
+                            .padding(.top, 8)
+                            Spacer()
                         }
                         .padding()
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 12) {
+                                ForEach(projectTasks) { task in
+                                    TaskRow(
+                                        task: task,
+                                        viewModel: taskViewModel,
+                                        isOverdue: false
+                                    )
+                                }
+                            }
+                            .padding()
+                        }
+                        .refreshable {
+                            loadProjectTasks()
+                        }
                     }
-                    .refreshable {
-                        loadProjectTasks()
+                }
+            } else if projectTasks.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(Color(hex: project.color))
+                    
+                    Text("Nenhuma tarefa")
+                        .font(.headline)
+                        .foregroundColor(textColor)
+                    
+                    Text("Este projeto ainda não possui tarefas")
+                        .font(.subheadline)
+                        .foregroundColor(secondaryTextColor)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    
+                    Button {
+                        showingCreateTask = true
+                    } label: {
+                        Text("Criar tarefa")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.blue)
+                            .cornerRadius(8)
                     }
+                    .padding(.top, 8)
+                }
+                .padding()
+            } else {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(projectTasks) { task in
+                            TaskRow(
+                                task: task,
+                                viewModel: taskViewModel,
+                                isOverdue: false
+                            )
+                        }
+                    }
+                    .padding()
+                }
+                .refreshable {
+                    loadProjectTasks()
                 }
             }
         }
@@ -118,6 +192,7 @@ struct ProjectTasksView: View {
     private func loadProjectTasks() {
         isLoading = true
         hasError = false
+        errorMessage = nil
         
         Task {
             do {
@@ -132,6 +207,27 @@ struct ProjectTasksView: View {
             } catch {
                 isLoading = false
                 hasError = true
+                
+                // Extract a user-friendly error message
+                if let apiError = error as? APIError {
+                    switch apiError {
+                    case .decodingError:
+                        errorMessage = "Erro ao processar a resposta do servidor. Tente novamente mais tarde."
+                    case .clientError(let code, _):
+                        errorMessage = "Erro de cliente (\(code)). Verifique sua conexão e tente novamente."
+                    case .serverError(let code, _):
+                        errorMessage = "Erro no servidor (\(code)). Tente novamente mais tarde."
+                    case .networkError:
+                        errorMessage = "Erro de conexão. Verifique sua internet e tente novamente."
+                    case .unauthorized, .authenticationFailed:
+                        errorMessage = "Erro de autenticação. Tente fazer login novamente."
+                    default:
+                        errorMessage = "Erro desconhecido. Tente novamente mais tarde."
+                    }
+                } else {
+                    errorMessage = "Erro ao carregar tarefas: \(error.localizedDescription)"
+                }
+                
                 print("Error loading project tasks: \(error)")
             }
         }

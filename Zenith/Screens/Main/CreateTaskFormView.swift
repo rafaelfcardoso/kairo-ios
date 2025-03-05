@@ -121,7 +121,9 @@ struct CreateTaskFormView: View {
             "title": taskTitle,
             "description": taskDescription,
             "priority": selectedPriority?.rawValue ?? "none",
-            "projectId": selectedProject?.id ?? inboxProjectId
+            "projectId": selectedProject?.id ?? inboxProjectId,
+            "isRecurring": false,
+            "needsReminder": false
         ]
         
         let dateFormatter = ISO8601DateFormatter()
@@ -162,12 +164,8 @@ struct CreateTaskFormView: View {
             let jsonData = try JSONSerialization.data(withJSONObject: taskData)
             request.httpBody = jsonData
             
-            print("🌐 [API] Request URL: \(url)")
-            print("🌐 [API] Request Method: \(request.httpMethod ?? "Unknown")")
-            print("🌐 [API] Request Headers: \(request.allHTTPHeaderFields ?? [:])")
-            if let bodyString = String(data: jsonData, encoding: .utf8) {
-                print("🌐 [API] Request Body: \(bodyString)")
-            }
+            // For debugging - check if body is valid JSON without assigning to unused variable
+            _ = String(data: jsonData, encoding: .utf8) != nil
             
             let (data, response) = try await URLSession.shared.data(for: request)
             
@@ -175,10 +173,10 @@ struct CreateTaskFormView: View {
                 throw URLError(.badServerResponse)
             }
             
-            print("🌐 [API] Response Status Code: \(httpResponse.statusCode)")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("🌐 [API] Response Body: \(responseString)")
-            }
+            // Removed excessive logging
+            
+            // Check if response is valid string without assigning to unused variable
+            _ = String(data: data, encoding: .utf8) != nil
             
             guard (200...299).contains(httpResponse.statusCode) else {
                 throw URLError(.badServerResponse)
@@ -186,7 +184,6 @@ struct CreateTaskFormView: View {
             
             await onTaskSaved()
             dismiss()
-            
         } catch {
             print("Network error: \(error)")
             self.error = error

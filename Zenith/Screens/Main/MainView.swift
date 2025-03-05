@@ -14,39 +14,57 @@ struct ErrorView: View {
     let secondaryTextColor: Color
     let textColor: Color
     let retryAction: () -> Void
+    var errorMessage: String? = nil
+    var isOfflineMode: Bool = false
     
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "wifi.slash")
+            Image(systemName: isOfflineMode ? "wifi.slash" : "exclamationmark.triangle")
                 .font(.system(size: 40))
                 .foregroundColor(secondaryTextColor)
             
-            Text("Não foi possível carregar as tarefas")
+            Text(isOfflineMode ? "Modo Offline" : "Não foi possível carregar as tarefas")
                 .font(.headline)
                 .foregroundColor(textColor)
             
-            Text("Verifique sua conexão e tente novamente")
-                .font(.subheadline)
-                .foregroundColor(secondaryTextColor)
-                .multilineTextAlignment(.center)
+            if let errorMessage = errorMessage {
+                Text(errorMessage)
+                    .font(.subheadline)
+                    .foregroundColor(secondaryTextColor)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            } else {
+                Text(isOfflineMode ? 
+                     "Você está trabalhando offline. Algumas funcionalidades podem estar limitadas." : 
+                     "Verifique sua conexão e tente novamente")
+                    .font(.subheadline)
+                    .foregroundColor(secondaryTextColor)
+                    .multilineTextAlignment(.center)
+            }
             
             Button(action: retryAction) {
                 Text("Tentar novamente")
                     .foregroundColor(.blue)
             }
             .padding(.top, 8)
+            
+            if isOfflineMode {
+                Text("Última atualização: \(formattedLastUpdate)")
+                    .font(.caption)
+                    .foregroundColor(secondaryTextColor)
+            }
         }
         .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.clear)
     }
-}
-
-// Add this enum after the ErrorView struct
-enum TaskFilter: String, CaseIterable {
-    case today = "Hoje"
-    case upcoming = "Próximas"
-    case inbox = "Entrada"
-    case completed = "Concluídas"
-    case focus = "Foco"
+    
+    private var formattedLastUpdate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter.string(from: Date())
+    }
 }
 
 struct MainView: View {
@@ -55,12 +73,13 @@ struct MainView: View {
     @State private var showingCreateTask = false
     @State private var isLoading = true
     @State private var hasError = false
+    @State private var errorMessage: String? = nil
     @State private var selectedTab = 0
     @Binding var showingSidebar: Bool
     @State private var navigationPath = NavigationPath()
     @Environment(\.colorScheme) var colorScheme
     @EnvironmentObject var focusSessionViewModel: FocusSessionViewModel
-    @State private var selectedTaskFilter: TaskFilter = .today
+    @State private var selectedFilterName: String = "Hoje"
     
     // Use app-level binding for selected project
     @Binding var selectedProject: Project?
@@ -105,18 +124,20 @@ struct MainView: View {
         if let project = selectedProject {
             return viewModel.getTasksForProject(projectId: project.id)
         } else {
-            // Return tasks based on selected filter
-            switch selectedTaskFilter {
-            case .today:
+            // Return tasks based on selected filter name
+            switch selectedFilterName {
+            case "Hoje":
                 return viewModel.todayTasks
-            case .upcoming:
+            case "Próximas":
                 return viewModel.upcomingTasks
-            case .inbox:
+            case "Entrada":
                 return viewModel.inboxTasks
-            case .completed:
+            case "Concluídas":
                 return viewModel.completedTasks
-            case .focus:
+            case "Foco":
                 return viewModel.focusTasks
+            default:
+                return viewModel.todayTasks
             }
         }
     }
@@ -135,19 +156,61 @@ struct MainView: View {
                 backgroundColor
                     .ignoresSafeArea()
                 
-                VStack(spacing: 0) {
-                    if isLoading {
+                VStack {
+                    if viewModel.isLoading {
                         ProgressView()
-                    } else if hasError {
+                            .padding(.top, 100)
+                    } else if hasError && !viewModel.isOfflineMode {
                         ErrorView(
                             secondaryTextColor: secondaryTextColor,
                             textColor: textColor,
                             retryAction: {
-                                performTaskLoad()
-                            }
+                                Task {
+                                    await performTaskLoad()
+                                }
+                            },
+                            errorMessage: errorMessage
                         )
+                    } else if viewModel.isOfflineMode {
+                        VStack {
+                            // Offline banner
+                            HStack {
+                                Image(systemName: "wifi.slash")
+                                    .foregroundColor(secondaryTextColor)
+                                Text("Modo Offline")
+                                    .font(.subheadline)
+                                    .foregroundColor(secondaryTextColor)
+                                Spacer()
+                                Button("Reconectar") {
+                                    Task {
+                                        await performTaskLoad()
+                                    }
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                            }
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                            .padding(.top)
+                            
+                            // Show cached content
+                            TaskContentView(
+                                selectedProject: $selectedProject,
+                                selectedTab: $selectedTab,
+                                viewModel: viewModel,
+                                showingCreateTask: $showingCreateTask,
+                                secondaryTextColor: secondaryTextColor,
+                                cardBackgroundColor: cardBackgroundColor,
+                                displayedTasks: displayedTasks,
+                                onLoadTasks: { @Sendable in
+                                    await self.performTaskLoad()
+                                }
+                            )
+                        }
                     } else {
-                        // Extract to a separate view component
                         TaskContentView(
                             selectedProject: $selectedProject,
                             selectedTab: $selectedTab,
@@ -157,35 +220,10 @@ struct MainView: View {
                             cardBackgroundColor: cardBackgroundColor,
                             displayedTasks: displayedTasks,
                             onLoadTasks: { @Sendable in
-                                self.performTaskLoad()
+                                await self.performTaskLoad()
                             }
                         )
                     }
-                }
-                
-                // Focus button - positioned above tab bar and main content
-                if !focusSessionViewModel.isActive {
-                    FocusButtonView(viewModel: focusSessionViewModel, colorScheme: colorScheme, backgroundColor: backgroundColor)
-                }
-                
-                if viewModel.showingUndoToast {
-                    UndoToastView(
-                        message: "\"\(viewModel.lastCompletedTaskTitle)\" concluída",
-                        action: {
-                            do {
-                                try await viewModel.undoLastCompletion()
-                                withAnimation {
-                                    viewModel.showingUndoToast = false
-                                }
-                            } catch {
-                                print("Error undoing task completion: \(error)")
-                            }
-                        },
-                        isPresented: $viewModel.showingUndoToast
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .padding(.bottom, 16)
-                    .zIndex(30)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -203,13 +241,15 @@ struct MainView: View {
                 }
             }
             .task {
-                performTaskLoad()
+                await performTaskLoad()
             }
             .sheet(isPresented: $showingCreateTask) {
                 CreateTaskFormView(
                     viewModel: viewModel,
                     onTaskSaved: { @Sendable in
-                        self.performTaskLoad()
+                        Task {
+                            await self.performTaskLoad()
+                        }
                     }
                 )
                 .presentationDetents([.medium, .large])
@@ -218,7 +258,9 @@ struct MainView: View {
                 .interactiveDismissDisabled(false)
             }
             .onChange(of: selectedProject) { _, _ in
-                performTaskLoad()
+                Task {
+                    await performTaskLoad()
+                }
             }
             .navigationDestination(for: Project.self) { project in
                 if project.isSystem {
@@ -245,29 +287,18 @@ struct MainView: View {
                 .font(.title3)
                 .foregroundColor(textColor)
         }
+        .accessibilityLabel("Open sidebar")
     }
     
     private var titleView: some View {
         VStack(spacing: 2) {
-            if let selectedProject = selectedProject {
-                Text(selectedProject.name)
-                    .font(.headline)
-                    .foregroundColor(textColor)
-            } else {
-                Text(selectedTaskFilter.rawValue.capitalized)
-                    .font(.headline)
-                    .foregroundColor(textColor)
-            }
+            Text(viewModel.greeting)
+                .font(.headline)
+                .foregroundColor(textColor)
             
-            if let selectedProject = selectedProject {
-                Text("\(viewModel.getTasksForProject(projectId: selectedProject.id).count) tasks")
-                    .font(.subheadline)
-                    .foregroundColor(secondaryTextColor)
-            } else {
-                Text("\(displayedTasks.count) tasks")
-                    .font(.subheadline)
-                    .foregroundColor(secondaryTextColor)
-            }
+            Text(viewModel.formattedDate)
+                .font(.subheadline)
+                .foregroundColor(secondaryTextColor)
         }
     }
     
@@ -279,6 +310,8 @@ struct MainView: View {
                 .font(.title3)
                 .foregroundColor(textColor)
         }
+        .accessibilityLabel("Add task")
+        .accessibilityIdentifier("add-task-button")
     }
     
     // MARK: - Data Loading
@@ -295,152 +328,47 @@ struct MainView: View {
     
     // Add a simplified handler for loading tasks that automatically handles errors
     @Sendable
-    private func performTaskLoad() {
-        Task { @MainActor in
-            isLoading = true
-            
-            do {
-                if selectedProject != nil {
-                    // If a project is selected, load tasks for that project
-                    try await viewModel.loadTasks()
-                } else {
-                    // Otherwise, load tasks based on the selected filter
-                    try await viewModel.loadTasks()
-                }
-                
-                hasError = false
-            } catch {
-                hasError = true
-                print("Error loading tasks: \(error)")
-            }
-            
-            isLoading = false
-        }
-    }
-}
-
-// MARK: - Focus Button View
-struct FocusButtonView: View {
-    @ObservedObject var viewModel: FocusSessionViewModel
-    let colorScheme: ColorScheme
-    let backgroundColor: Color
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            
-            // Add background only to the button container, not the whole VStack
-            HStack {
-                Button {
-                    viewModel.isExpanded = true
-                } label: {
-                    HStack {
-                        Image(systemName: "timer")
-                            .font(.headline)
-                        Text("Iniciar Foco")
-                            .font(.headline)
-                    }
-                    .foregroundColor(colorScheme == .dark ? .black : .white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(colorScheme == .dark ? Color(hex: "F1F2F4") : .black)
-                    .cornerRadius(12)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                // Opaque background
-                Rectangle()
-                    .fill(colorScheme == .dark ? Color(white: 0.1) : backgroundColor)
-            )
-        }
-        .padding(.bottom, 50) // Additional padding to appear above tab bar
-        .zIndex(25) // Above tab bar but below sidebar and toasts
-    }
-}
-
-// Add this new view component after MainView
-struct TaskContentView: View {
-    @Binding var selectedProject: Project?
-    @Binding var selectedTab: Int
-    @ObservedObject var viewModel: TaskViewModel
-    @Binding var showingCreateTask: Bool
-    let secondaryTextColor: Color
-    let cardBackgroundColor: Color
-    let displayedTasks: [TodoTask]
-    let onLoadTasks: @Sendable () -> Void
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            if selectedProject == nil && !viewModel.overdueTasks.isEmpty {
-                TabView(selection: $selectedTab) {
-                    // Overdue Section
-                    TaskSectionView(
-                        title: "Atrasadas",
-                        tasks: viewModel.overdueTasks,
-                        secondaryTextColor: secondaryTextColor,
-                        cardBackgroundColor: cardBackgroundColor,
-                        onTaskCreated: { @Sendable in
-                            await handleTaskCreation()
-                        },
-                        viewModel: viewModel,
-                        showingCreateTask: $showingCreateTask
-                    )
-                    .tag(0)
-                    .refreshable {
-                        await handleRefresh()
-                    }
-                    
-                    // Today Section
-                    TaskSectionView(
-                        title: "Hoje",
-                        tasks: viewModel.tasks,
-                        secondaryTextColor: secondaryTextColor,
-                        cardBackgroundColor: cardBackgroundColor,
-                        onTaskCreated: { @Sendable in
-                            await handleTaskCreation()
-                        },
-                        viewModel: viewModel,
-                        showingCreateTask: $showingCreateTask
-                    )
-                    .tag(1)
-                    .refreshable {
-                        await handleRefresh()
-                    }
-                }
-                .tabViewStyle(.page)
-                .indexViewStyle(.page(backgroundDisplayMode: .always))
+    private func performTaskLoad() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            if selectedProject != nil {
+                // If a project is selected, load tasks for that project
+                try await viewModel.loadTasks()
             } else {
-                TaskSectionView(
-                    title: selectedProject?.name ?? "Hoje",
-                    tasks: displayedTasks,
-                    secondaryTextColor: secondaryTextColor,
-                    cardBackgroundColor: cardBackgroundColor,
-                    onTaskCreated: { @Sendable in
-                        await handleTaskCreation()
-                    },
-                    viewModel: viewModel,
-                    showingCreateTask: $showingCreateTask
-                )
-                .refreshable {
-                    await handleRefresh()
-                }
+                // Otherwise, load tasks based on the selected filter
+                try await viewModel.loadTasks()
             }
+            
+            hasError = false
+        } catch {
+            hasError = true
+            
+            // Extract a user-friendly error message
+            if let apiError = error as? APIError {
+                switch apiError {
+                case .decodingError:
+                    errorMessage = "Erro ao processar a resposta do servidor. Tente novamente mais tarde."
+                case .clientError(let code, _):
+                    errorMessage = "Erro de cliente (\(code)). Verifique sua conexão e tente novamente."
+                case .serverError(let code, _):
+                    errorMessage = "Erro no servidor (\(code)). Tente novamente mais tarde."
+                case .networkError:
+                    errorMessage = "Erro de conexão. Verifique sua internet e tente novamente."
+                case .unauthorized, .authenticationFailed:
+                    errorMessage = "Erro de autenticação. Tente fazer login novamente."
+                default:
+                    errorMessage = "Erro desconhecido. Tente novamente mais tarde."
+                }
+            } else {
+                errorMessage = "Erro ao carregar tarefas: \(error.localizedDescription)"
+            }
+            
+            print("Error loading tasks: \(error)")
         }
-    }
-    
-    // Helper functions to reduce repetitive code
-    @Sendable
-    private func handleTaskCreation() async {
-        onLoadTasks()
-    }
-    
-    @Sendable
-    private func handleRefresh() async {
-        onLoadTasks()
-        // Adding a small delay to make the refresh indicator visible
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        
+        isLoading = false
     }
 }
 
