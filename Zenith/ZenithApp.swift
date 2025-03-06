@@ -286,10 +286,13 @@ struct ZenithApp: App {
     @State private var chatInputRef: GlobalChatInput? = nil
     
     init() {
-        // Configure navigation bar and status bar appearance for consistent translucent effect
+        // Configure navigation bar appearance with opaque background that matches app theme
         let appearance = UINavigationBarAppearance()
-        appearance.configureWithTransparentBackground()
-        appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+        appearance.configureWithOpaqueBackground()
+        
+        // Set background color to match app background using UITraitCollection instead of SwiftUI Environment
+        let isDarkMode = UITraitCollection.current.userInterfaceStyle == .dark
+        appearance.backgroundColor = isDarkMode ? .black : UIColor(Color(hex: "F1F2F4"))
         
         // Apply to all navigation bars in the app
         UINavigationBar.appearance().standardAppearance = appearance
@@ -305,13 +308,16 @@ struct ZenithApp: App {
                     Color(colorScheme == .dark ? .black : Color(hex: "F1F2F4"))
                         .ignoresSafeArea()
                     
-                    // Background tap recognizer to dismiss keyboard
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            hideKeyboard()
-                        }
-                        .ignoresSafeArea()
+                    // Background tap recognizer to dismiss keyboard - improved to capture taps reliably
+                    if keyboardHandler.keyboardHeight > 0 {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                hideKeyboard()
+                            }
+                            .ignoresSafeArea()
+                            .zIndex(5) // Place it above content but below the keyboard/chat input
+                    }
                     
                     // Main content area with tab bar
                     ZStack {
@@ -535,7 +541,8 @@ struct ZenithApp: App {
     
     // Method to dismiss keyboard
     private func hideKeyboard() {
-        UIApplication.shared.endEditing()
+        print("Dismissing keyboard")
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
     
     // Preload data when app starts to ensure it's available when needed

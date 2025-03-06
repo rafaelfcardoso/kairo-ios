@@ -29,7 +29,7 @@ struct BlocksView: View {
             // Content
             ScrollView {
                 VStack(spacing: 20) {
-                    // Empty spacer to push content below navigation bar
+                    // Empty spacer to push content below navigation bar - reduced since we have an opaque navbar
                     Spacer()
                         .frame(height: 20)
                     
@@ -170,13 +170,10 @@ struct BlocksView: View {
                     .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 5, x: 0, y: 2)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
+                .padding(.top, 24)
                 .padding(.bottom, 20)
             }
             .scrollIndicators(.hidden)
-            .safeAreaInset(edge: .top) {
-                Color.clear.frame(height: 8)
-            }
         }
         .navigationTitle("Blocos")
         .navigationBarTitleDisplayMode(.inline)
