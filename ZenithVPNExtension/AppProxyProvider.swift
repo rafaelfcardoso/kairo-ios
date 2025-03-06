@@ -1,6 +1,6 @@
 import NetworkExtension
 
-class AppProxyProvider: NEAppProxyProvider {
+class PacketTunnelProvider: NETunnelProvider {
     
     // MARK: - Properties
     
@@ -16,11 +16,11 @@ class AppProxyProvider: NEAppProxyProvider {
     /// Date when the provider started
     private var startDate: Date?
     
-    // MARK: - NEAppProxyProvider Methods
+    // MARK: - NETunnelProvider Methods
     
-    override func startProxy(options: [String: Any]? = nil, completionHandler: @escaping (Error?) -> Void) {
+    override func startTunnel(options: [String: NSObject]? = nil, completionHandler: @escaping (Error?) -> Void) {
         // Log start of proxy
-        NSLog("Starting Zenith App Proxy Provider")
+        NSLog("Starting Zenith Tunnel Provider")
         
         // Record start time
         startDate = Date()
@@ -38,13 +38,13 @@ class AppProxyProvider: NEAppProxyProvider {
             NSLog("No provider configuration available")
         }
         
-        // Complete startup
-        completionHandler(nil)
+        // Set up the tunnel
+        setupTunnel(completionHandler: completionHandler)
     }
     
-    override func stopProxy(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
+    override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
         // Log stop reason
-        NSLog("Stopping Zenith App Proxy Provider with reason: \(reason.rawValue)")
+        NSLog("Stopping Zenith Tunnel Provider with reason: \(reason.rawValue)")
         
         // Save statistics before stopping
         saveStatistics()
@@ -53,132 +53,52 @@ class AppProxyProvider: NEAppProxyProvider {
         completionHandler()
     }
     
-    override func handleAppProxyFlow(_ flow: NEAppProxyFlow) -> Bool {
-        // Check if this is a TCP flow
-        guard let tcpFlow = flow as? NEAppProxyTCPFlow else {
-            NSLog("Received non-TCP flow, ignoring")
-            return false
-        }
-        
-        // Get the remote endpoint
-        guard let remoteEndpoint = tcpFlow.remoteEndpoint as? NWHostEndpoint else {
-            NSLog("Could not determine remote endpoint")
-            return false
-        }
-        
-        // Get the app info
-        let appInfo = getAppInfo(from: flow)
-        
-        // Check if we should block this flow
-        if shouldBlockFlow(remoteEndpoint: remoteEndpoint, appInfo: appInfo) {
-            // Block the flow by not handling it
-            NSLog("Blocking flow to \(remoteEndpoint.hostname):\(remoteEndpoint.port) from app \(appInfo?.bundleIdentifier ?? "unknown")")
-            
-            // Update statistics
-            updateBlockedStatistics(domain: remoteEndpoint.hostname, appBundleId: appInfo?.bundleIdentifier)
-            
-            return false
-        }
-        
-        // Allow the flow by handling it
-        NSLog("Allowing flow to \(remoteEndpoint.hostname):\(remoteEndpoint.port) from app \(appInfo?.bundleIdentifier ?? "unknown")")
-        
-        // Set up the connection
-        tcpFlow.open(withLocalEndpoint: nil) { error in
-            if let error = error {
-                NSLog("Error opening TCP flow: \(error.localizedDescription)")
-                return
-            }
-            
-            // Start reading and writing data
-            self.handleTCPFlow(tcpFlow)
-        }
-        
-        return true
-    }
-    
     // MARK: - Helper Methods
     
-    /// Handle TCP flow by reading and writing data
-    private func handleTCPFlow(_ flow: NEAppProxyTCPFlow) {
-        // Read data from the flow
-        flow.readData { data, error in
+    /// Set up the tunnel interface
+    private func setupTunnel(completionHandler: @escaping (Error?) -> Void) {
+        // Create a network settings object
+        let networkSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
+        
+        // Configure DNS settings to block domains
+        let dnsSettings = NEDNSSettings(servers: ["1.1.1.1", "8.8.8.8"])
+        
+        // Add blocked domains if available
+        if let config = blockingConfiguration {
+            var matchDomains = [String: [String]]()
+            
+            // Get active rules
+            let activeProfileRules = config.activeProfileId.flatMap { profileId in
+                config.profiles.first(where: { $0.id == profileId })?.rules.filter { $0.isActive } ?? []
+            } ?? []
+            
+            let activeDefaultRules = config.defaultRules.filter { $0.isActive }
+            let allActiveRules = activeProfileRules + activeDefaultRules
+            
+            // Add domain rules to DNS block list
+            for rule in allActiveRules where rule.type == .domain {
+                matchDomains[rule.pattern] = ["127.0.0.1"]
+            }
+            
+            if !matchDomains.isEmpty {
+                dnsSettings.matchDomains = Array(matchDomains.keys)
+                dnsSettings.matchDomainsNoSearch = true
+            }
+        }
+        
+        networkSettings.dnsSettings = dnsSettings
+        
+        // Apply the network settings
+        setTunnelNetworkSettings(networkSettings) { error in
             if let error = error {
-                NSLog("Error reading data: \(error.localizedDescription)")
-                flow.closeReadWithError(error)
+                NSLog("Error setting tunnel network settings: \(error.localizedDescription)")
+                completionHandler(error)
                 return
             }
             
-            guard let data = data else {
-                NSLog("No data received, closing flow")
-                flow.closeReadWithError(nil)
-                return
-            }
-            
-            // Write data back to the flow
-            flow.write(data) { error in
-                if let error = error {
-                    NSLog("Error writing data: \(error.localizedDescription)")
-                    flow.closeWriteWithError(error)
-                    return
-                }
-                
-                // Continue reading data
-                self.handleTCPFlow(flow)
-            }
+            NSLog("Successfully set up tunnel network settings")
+            completionHandler(nil)
         }
-    }
-    
-    /// Get app information from the flow
-    private func getAppInfo(from flow: NEAppProxyFlow) -> NEAppInfo? {
-        return flow.metaData?[NEFlowMetaDataKey.appInfo] as? NEAppInfo
-    }
-    
-    /// Determine if a flow should be blocked based on rules
-    private func shouldBlockFlow(remoteEndpoint: NWHostEndpoint, appInfo: NEAppInfo?) -> Bool {
-        guard let config = blockingConfiguration else {
-            return false
-        }
-        
-        // Get active rules
-        let activeProfileRules = config.activeProfileId.flatMap { profileId in
-            config.profiles.first(where: { $0.id == profileId })?.rules.filter { $0.isActive } ?? []
-        } ?? []
-        
-        let activeDefaultRules = config.defaultRules.filter { $0.isActive }
-        let allActiveRules = activeProfileRules + activeDefaultRules
-        
-        // Check domain rules
-        for rule in allActiveRules where rule.type == .domain {
-            if remoteEndpoint.hostname.contains(rule.pattern) {
-                return true
-            }
-        }
-        
-        // Check app rules if app info is available
-        if let appInfo = appInfo {
-            for rule in allActiveRules where rule.type == .app {
-                if appInfo.bundleIdentifier == rule.pattern {
-                    return true
-                }
-            }
-        }
-        
-        // Check keyword rules
-        for rule in allActiveRules where rule.type == .keyword {
-            if remoteEndpoint.hostname.contains(rule.pattern) {
-                return true
-            }
-        }
-        
-        // Check IP address rules
-        for rule in allActiveRules where rule.type == .ipAddress {
-            if remoteEndpoint.hostname == rule.pattern {
-                return true
-            }
-        }
-        
-        return false
     }
     
     /// Update statistics for blocked content
@@ -225,7 +145,7 @@ class AppProxyProvider: NEAppProxyProvider {
         // Convert configuration to JSON
         do {
             let configData = try JSONEncoder().encode(config)
-            guard let configDict = try JSONSerialization.jsonObject(with: configData) as? [String: Any] else {
+            guard let configDict = try? JSONSerialization.jsonObject(with: configData) as? [String: Any] else {
                 NSLog("Error converting configuration to dictionary")
                 return
             }

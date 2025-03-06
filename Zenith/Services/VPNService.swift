@@ -46,11 +46,11 @@ class VPNService {
             switch result {
             case .success:
                 // Configure the VPN protocol
-                let appProxyProvider = NEAppProxyProviderProtocol()
-                appProxyProvider.providerBundleIdentifier = bundleIdentifier
-                appProxyProvider.serverAddress = "Zenith Distraction Blocker"
+                let tunnelProtocol = NETunnelProviderProtocol()
+                tunnelProtocol.providerBundleIdentifier = bundleIdentifier
+                tunnelProtocol.serverAddress = "Zenith Distraction Blocker"
                 
-                self.vpnManager.protocolConfiguration = appProxyProvider
+                self.vpnManager.protocolConfiguration = tunnelProtocol
                 self.vpnManager.localizedDescription = "Zenith Distraction Blocker"
                 self.vpnManager.isEnabled = true
                 
@@ -100,8 +100,8 @@ class VPNService {
     
     /// Pass the current blocking configuration to the VPN extension
     func updateBlockingConfiguration(_ configuration: VPNConfiguration) {
-        guard let appProxyProvider = vpnManager.protocolConfiguration as? NEAppProxyProviderProtocol else {
-            print("Error: Protocol configuration is not an App Proxy Provider")
+        guard let tunnelProtocol = vpnManager.protocolConfiguration as? NETunnelProviderProtocol else {
+            print("Error: Protocol configuration is not a Tunnel Provider Protocol")
             return
         }
         
@@ -118,8 +118,8 @@ class VPNService {
         }
         
         // Update the provider configuration
-        appProxyProvider.providerConfiguration = configDict
-        vpnManager.protocolConfiguration = appProxyProvider
+        tunnelProtocol.providerConfiguration = configDict
+        vpnManager.protocolConfiguration = tunnelProtocol
         
         // Save the configuration
         saveVPNConfiguration { result in

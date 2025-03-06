@@ -149,11 +149,11 @@ class BlocksViewModel: ObservableObject {
             }
             
             // Configure the VPN protocol
-            let appProxyProvider = NEAppProxyProviderProtocol()
-            appProxyProvider.providerBundleIdentifier = "com.zenith.ZenithVPNExtension"
-            appProxyProvider.serverAddress = "Zenith Distraction Blocker"
+            let tunnelProtocol = NETunnelProviderProtocol()
+            tunnelProtocol.providerBundleIdentifier = "com.zenith.ZenithVPNExtension"
+            tunnelProtocol.serverAddress = "Zenith Distraction Blocker"
             
-            self.vpnManager.protocolConfiguration = appProxyProvider
+            self.vpnManager.protocolConfiguration = tunnelProtocol
             self.vpnManager.localizedDescription = "Zenith Distraction Blocker"
             self.vpnManager.isEnabled = true
             
