@@ -3,9 +3,11 @@ import SwiftUI
 struct BlocksView: View {
     @StateObject private var viewModel = BlocksViewModel()
     @EnvironmentObject var projectViewModel: ProjectViewModel
-    @EnvironmentObject var focusSessionViewModel: FocusSessionViewModel
     @Environment(\.colorScheme) var colorScheme
     @Binding var showingSidebar: Bool
+    
+    // Make AppState optional to prevent crashes in tests
+    @EnvironmentObject private var appState: AppState
     
     var cardBackgroundColor: Color {
         colorScheme == .dark ? Color(UIColor.systemGray6) : .white
@@ -27,38 +29,146 @@ struct BlocksView: View {
             // Content
             ScrollView {
                 VStack(spacing: 20) {
-                    InsightsDashboard(
-                        focusScore: viewModel.focusScore,
-                        focusTrend: viewModel.focusTrend,
-                        screenTime: viewModel.screenTime,
-                        protectedTime: viewModel.protectedTime,
-                        timeDistribution: viewModel.timeDistribution
-                    )
+                    // Shield status card
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Escudo de Bloqueio")
+                                    .font(.headline)
+                                    .foregroundColor(textColor)
+                                
+                                Text("Bloqueie distrações e mantenha o foco")
+                                    .font(.subheadline)
+                                    .foregroundColor(Color.gray)
+                            }
+                            
+                            Spacer()
+                            
+                            Toggle("", isOn: $viewModel.isShieldActive)
+                                .labelsHidden()
+                                .onChange(of: viewModel.isShieldActive) { oldValue, newValue in
+                                    viewModel.toggleShield()
+                                }
+                        }
+                        
+                        if viewModel.isShieldActive {
+                            HStack(spacing: 12) {
+                                Image(systemName: "checkmark.shield.fill")
+                                    .foregroundColor(.green)
+                                    .font(.title2)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Escudo Ativo")
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(.green)
+                                    
+                                    Text("\(viewModel.activeBlockCount) bloqueios configurados")
+                                        .font(.caption)
+                                        .foregroundColor(Color.gray)
+                                }
+                                
+                                Spacer()
+                                
+                                Button(action: {
+                                    // Open shield settings
+                                    viewModel.openSettings()
+                                }) {
+                                    Text("Configurar")
+                                        .font(.caption.bold())
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color.blue.opacity(0.1))
+                                        .foregroundColor(.blue)
+                                        .cornerRadius(8)
+                                }
+                            }
+                            .padding(.top, 8)
+                        }
+                    }
+                    .padding()
                     .background(cardBackgroundColor)
                     .cornerRadius(12)
                     .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 5, x: 0, y: 2)
                     
-                    ActiveShieldStatus(
-                        mode: viewModel.currentMode,
-                        isActive: viewModel.isShieldActive,
-                        blockCount: viewModel.activeBlockCount,
-                        onToggle: viewModel.toggleShield
-                    )
+                    // Profiles section
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Perfis de Bloqueio")
+                            .font(.headline)
+                            .foregroundColor(textColor)
+                        
+                        ForEach(viewModel.vpnConfiguration.profiles) { profile in
+                            BlockingProfileCard(
+                                profile: profile,
+                                isActive: viewModel.vpnConfiguration.activeProfileId == profile.id,
+                                onActivate: {
+                                    viewModel.activateProfile(profile)
+                                },
+                                onEdit: {
+                                    // Edit profile action
+                                }
+                            )
+                        }
+                        
+                        Button(action: {
+                            // Add new profile action
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Adicionar Perfil")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue.opacity(0.1))
+                            .foregroundColor(.blue)
+                            .cornerRadius(8)
+                        }
+                    }
+                    .padding()
                     .background(cardBackgroundColor)
                     .cornerRadius(12)
                     .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 5, x: 0, y: 2)
                     
-                    StatisticsCards(
-                        blocksToday: viewModel.blocksToday,
-                        blocksTrend: viewModel.blocksTrend,
-                        savedTime: viewModel.savedTime,
-                        savedTimeTrend: viewModel.savedTimeTrend
-                    )
+                    // Rules section
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Regras de Bloqueio")
+                            .font(.headline)
+                            .foregroundColor(textColor)
+                        
+                        ForEach(viewModel.vpnConfiguration.defaultRules) { rule in
+                            BlockingRuleCard(
+                                rule: rule,
+                                onToggle: {
+                                    // Toggle rule action
+                                },
+                                onEdit: {
+                                    // Edit rule action
+                                }
+                            )
+                        }
+                        
+                        Button(action: {
+                            // Add new rule action
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Adicionar Regra")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue.opacity(0.1))
+                            .foregroundColor(.blue)
+                            .cornerRadius(8)
+                        }
+                    }
+                    .padding()
+                    .background(cardBackgroundColor)
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 5, x: 0, y: 2)
                 }
                 .padding()
             }
         }
-        .navigationTitle("Blocks")
+        .navigationTitle("Blocos")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -75,7 +185,28 @@ struct BlocksView: View {
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
-                settingsButton
+                HStack(spacing: 16) {
+                    // Statistics button
+                    Button {
+                        // Direct tab change
+                        print("BlocksView: Statistics button tapped")
+                        
+                        // Close sidebar if open
+                        if appState.showingSidebar {
+                            appState.showingSidebar = false
+                        }
+                        
+                        // Switch tab directly
+                        appState.selectedTab = .statistics
+                    } label: {
+                        Image(systemName: "chart.bar")
+                            .font(.title3)
+                            .foregroundColor(textColor)
+                    }
+                    
+                    // Settings button
+                    settingsButton
+                }
             }
         }
         .refreshable {
@@ -92,6 +223,136 @@ struct BlocksView: View {
     }
 }
 
+// Supporting views
+struct BlockingProfileCard: View {
+    let profile: BlockingProfile
+    let isActive: Bool
+    let onActivate: () -> Void
+    let onEdit: () -> Void
+    @Environment(\.colorScheme) var colorScheme
+    
+    var textColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(profile.name)
+                    .font(.subheadline.bold())
+                    .foregroundColor(textColor)
+                
+                Text(profile.description)
+                    .font(.caption)
+                    .foregroundColor(Color.gray)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+            
+            if isActive {
+                Text("Ativo")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.green.opacity(0.2))
+                    .foregroundColor(.green)
+                    .cornerRadius(4)
+            } else {
+                Button(action: onActivate) {
+                    Text("Ativar")
+                        .font(.caption.bold())
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .cornerRadius(4)
+                }
+            }
+            
+            Button(action: onEdit) {
+                Image(systemName: "pencil")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(8)
+            }
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6).opacity(0.5))
+        .cornerRadius(8)
+    }
+}
+
+struct BlockingRuleCard: View {
+    let rule: BlockingRule
+    let onToggle: () -> Void
+    let onEdit: () -> Void
+    @Environment(\.colorScheme) var colorScheme
+    
+    var textColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+    
+    var categoryColor: Color {
+        switch rule.category {
+        case .socialMedia:
+            return .blue
+        case .entertainment:
+            return .purple
+        case .news:
+            return .orange
+        case .shopping:
+            return .green
+        case .productivity:
+            return .red
+        case .custom:
+            return .gray
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(rule.name)
+                        .font(.subheadline.bold())
+                        .foregroundColor(textColor)
+                    
+                    Text(rule.category.rawValue)
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(categoryColor.opacity(0.2))
+                        .foregroundColor(categoryColor)
+                        .cornerRadius(4)
+                }
+                
+                Text(rule.pattern)
+                    .font(.caption)
+                    .foregroundColor(Color.gray)
+            }
+            
+            Spacer()
+            
+            Toggle("", isOn: .constant(rule.isActive))
+                .labelsHidden()
+                .onChange(of: rule.isActive) { oldValue, newValue in
+                    onToggle()
+                }
+            
+            Button(action: onEdit) {
+                Image(systemName: "pencil")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(8)
+            }
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6).opacity(0.5))
+        .cornerRadius(8)
+    }
+}
+
 // Preview provider
 struct BlocksView_Previews: PreviewProvider {
     static var previews: some View {
@@ -99,12 +360,14 @@ struct BlocksView_Previews: PreviewProvider {
             NavigationView {
                 BlocksView(showingSidebar: .constant(false))
                     .environmentObject(ProjectViewModel())
+                    .environmentObject(AppState())
             }
             .preferredColorScheme(.light)
             
             NavigationView {
                 BlocksView(showingSidebar: .constant(false))
                     .environmentObject(ProjectViewModel())
+                    .environmentObject(AppState())
             }
             .preferredColorScheme(.dark)
         }

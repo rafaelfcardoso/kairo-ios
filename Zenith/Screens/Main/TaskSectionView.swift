@@ -60,7 +60,7 @@ struct TaskSectionView: View {
                         .foregroundColor(secondaryTextColor)
                 }
                 .padding(.horizontal)
-                .padding(.top)
+                .padding(.top, 24)
                 
                 TaskListView(
                     showingCreateTask: $showingCreateTask,

@@ -6,8 +6,12 @@ struct SidebarMenu: View {
     @Environment(\.colorScheme) var colorScheme
     @Binding var isShowingSidebar: Bool
     @Binding var selectedProject: Project?
+    @Binding var sidebarSelection: SidebarSelection
     @State private var showingCreateProject = false
     @State private var statusBarHeight: CGFloat = 0
+    
+    // Add optional AppState
+    @EnvironmentObject private var appState: AppState
     
     // Theme colors
     var backgroundColor: Color {
@@ -79,8 +83,9 @@ struct SidebarMenu: View {
                             icon: "filemenu.and.selection",
                             title: "Hoje",
                             count: taskViewModel.tasks.count + taskViewModel.overdueTasks.count,
-                            isSelected: selectedProject == nil
+                            isSelected: sidebarSelection == .today
                         ) {
+                            sidebarSelection = .today
                             selectedProject = nil
                             withAnimation {
                                 isShowingSidebar = false
@@ -93,12 +98,31 @@ struct SidebarMenu: View {
                                 icon: "tray",
                                 title: "Entrada",
                                 count: inboxProject.taskCount ?? 0,
-                                isSelected: selectedProject?.id == inboxProject.id
+                                isSelected: {
+                                    if case .inbox(let project) = sidebarSelection, project.id == inboxProject.id {
+                                        return true
+                                    }
+                                    return false
+                                }()
                             ) {
+                                sidebarSelection = .inbox(inboxProject)
                                 selectedProject = inboxProject
                                 withAnimation {
                                     isShowingSidebar = false
                                 }
+                            }
+                        }
+                        
+                        // Blocks
+                        menuItem(
+                            icon: "rectangle.stack.badge.plus",
+                            title: "Blocos",
+                            isSelected: sidebarSelection == .blocks
+                        ) {
+                            sidebarSelection = .blocks
+                            selectedProject = nil
+                            withAnimation {
+                                isShowingSidebar = false
                             }
                         }
                         
@@ -164,8 +188,14 @@ struct SidebarMenu: View {
                                     title: project.name,
                                     count: project.taskCount ?? 0,
                                     iconColor: Color(hex: project.color),
-                                    isSelected: selectedProject?.id == project.id
+                                    isSelected: {
+                                        if case .project(let p) = sidebarSelection, p.id == project.id {
+                                            return true
+                                        }
+                                        return false
+                                    }()
                                 ) {
+                                    sidebarSelection = .project(project)
                                     selectedProject = project
                                     withAnimation {
                                         isShowingSidebar = false
@@ -295,7 +325,8 @@ struct SidebarMenu: View {
     ZStack {
         Color.gray.opacity(0.3).edgesIgnoringSafeArea(.all)
         
-        SidebarMenu(taskViewModel: TaskViewModel(), isShowingSidebar: .constant(true), selectedProject: .constant(nil))
+        SidebarMenu(taskViewModel: TaskViewModel(), isShowingSidebar: .constant(true), selectedProject: .constant(nil), sidebarSelection: .constant(.today))
             .environmentObject(ProjectViewModel())
+            .environmentObject(AppState())
     }
 } 

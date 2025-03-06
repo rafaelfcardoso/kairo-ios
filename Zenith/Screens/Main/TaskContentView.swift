@@ -52,6 +52,12 @@ struct TaskContentView: View {
                 }
                 .tabViewStyle(.page)
                 .indexViewStyle(.page(backgroundDisplayMode: .always))
+                .padding(.top, 12)
+                .contentMargins(.horizontal, 16, for: .scrollContent)
+                .safeAreaInset(edge: .bottom) {
+                    // Add bottom padding to ensure the page indicator isn't covered by chat input
+                    Color.clear.frame(height: 50)
+                }
             } else {
                 TaskSectionView(
                     title: selectedProject?.name ?? getFilterTitle(),
@@ -68,6 +74,8 @@ struct TaskContentView: View {
                 .refreshable {
                     await handleRefresh()
                 }
+                .padding(.top, 12)
+                .contentMargins(.horizontal, 16, for: .scrollContent)
             }
         }
     }

@@ -81,6 +81,9 @@ struct MainView: View {
     @EnvironmentObject var focusSessionViewModel: FocusSessionViewModel
     @State private var selectedFilterName: String = "Hoje"
     
+    // Add optional AppState
+    @EnvironmentObject private var appState: AppState
+    
     // Use app-level binding for selected project
     @Binding var selectedProject: Project?
     
@@ -156,7 +159,7 @@ struct MainView: View {
                 backgroundColor
                     .ignoresSafeArea()
                 
-                VStack {
+                VStack(spacing: 0) {
                     if viewModel.isLoading {
                         ProgressView()
                             .padding(.top, 100)
@@ -225,6 +228,10 @@ struct MainView: View {
                         )
                     }
                 }
+                .safeAreaInset(edge: .top) {
+                    // Add an empty spacer to ensure content respects the navigation bar
+                    Color.clear.frame(height: 8)  // Adjust height for more spacing
+                }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -240,6 +247,8 @@ struct MainView: View {
                     addButton
                 }
             }
+            .toolbarBackground(backgroundColor, for: .navigationBar)  // Set navigation bar background
+            .toolbarBackground(.visible, for: .navigationBar)  // Make it visible
             .task {
                 await performTaskLoad()
             }
@@ -286,7 +295,10 @@ struct MainView: View {
             Image(systemName: "line.3.horizontal")
                 .font(.title3)
                 .foregroundColor(textColor)
+                .frame(width: 44, height: 44)  // HIG recommended touch target size
+                .contentShape(Rectangle())
         }
+        .padding(.leading, 4)  // Add extra leading padding
         .accessibilityLabel("Open sidebar")
     }
     
@@ -309,7 +321,10 @@ struct MainView: View {
             Image(systemName: "plus")
                 .font(.title3)
                 .foregroundColor(textColor)
+                .frame(width: 44, height: 44)  // HIG recommended touch target size
+                .contentShape(Rectangle())
         }
+        .padding(.trailing, 4)  // Add extra trailing padding
         .accessibilityLabel("Add task")
         .accessibilityIdentifier("add-task-button")
     }
@@ -378,5 +393,6 @@ struct MainView_Previews: PreviewProvider {
             .environmentObject(TaskViewModel())
             .environmentObject(FocusSessionViewModel())
             .environmentObject(ProjectViewModel())
+            .environmentObject(AppState())
     }
 } 

@@ -115,28 +115,36 @@ class HapticManager {
 // MARK: - Main Navigation
 enum Tab: Int, CaseIterable, Hashable {
     case today = 0
-    case blocks = 1
+    case statistics = 1
     
     var title: String {
         switch self {
         case .today: return "Início"
-        case .blocks: return "Blocks"
+        case .statistics: return "Estatísticas"
         }
     }
     
     var icon: String {
         switch self {
         case .today: return "house"
-        case .blocks: return "rectangle.stack.badge.plus"
+        case .statistics: return "chart.bar"
         }
     }
     
     var selectedIcon: String {
         switch self {
         case .today: return "house.fill"
-        case .blocks: return "rectangle.stack.badge.plus.fill"
+        case .statistics: return "chart.bar.fill"
         }
     }
+}
+
+// MARK: - Sidebar Navigation
+enum SidebarSelection: Equatable {
+    case today
+    case inbox(Project)
+    case blocks
+    case project(Project)
 }
 
 // MARK: - Custom Tab Bar
@@ -144,54 +152,55 @@ struct CustomTabBar: View {
     @Binding var selectedTab: Tab
     @ObservedObject var focusViewModel: FocusSessionViewModel
     @Environment(\.colorScheme) var colorScheme
+    @EnvironmentObject private var appState: AppState
+    
+    // Standard tab bar height per Apple HIG
+    private let tabBarHeight: CGFloat = 49
     
     var body: some View {
-        // If focus session is active, use a simpler 2-item layout
-        if focusViewModel.isActive {
-            // Two-tab layout when focus session is active
+        ZStack {
+            // Background of the tab bar
+            Rectangle()
+                .fill(colorScheme == .dark ? Color.black : Color(.systemGray6))
+                .frame(height: tabBarHeight)
+                .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: -1)
+            
+            // Tab items
             HStack(spacing: 0) {
-                // Evenly spaced buttons
-                Spacer()
-                tabButton(for: .today)
-                Spacer()
-                tabButton(for: .blocks)
-                Spacer()
+                if focusViewModel.isActive {
+                    // Two-tab layout when focus session is active
+                    Spacer()
+                    tabButton(for: .today)
+                    Spacer()
+                    tabButton(for: .statistics)
+                    Spacer()
+                } else {
+                    // Three-column layout with space for focus button
+                    tabButton(for: .today)
+                        .frame(maxWidth: .infinity)
+                    
+                    // Empty center space for focus button
+                    Spacer()
+                        .frame(width: 80)
+                    
+                    tabButton(for: .statistics)
+                        .frame(maxWidth: .infinity)
+                }
             }
-            .frame(height: 51)
-            .background(
-                Rectangle()
-                    .fill(colorScheme == .dark ? Color.black : Color(.systemGray6))
-            )
-            .onAppear {
-                AppTheme.shared.updateColorScheme(colorScheme)
-            }
-            .onChange(of: colorScheme) { _, newValue in
-                AppTheme.shared.updateColorScheme(newValue)
-            }
-        } else {
-            // Standard 3-item layout with focus button in middle
-            HStack(spacing: 0) {
-                // Left tab
-                tabButton(for: .today)
-                
-                // Center create button
+            
+            // Focus button - positioned at the top of the container
+            if !focusViewModel.isActive {
                 focusButton
-                
-                // Right tab
-                tabButton(for: .blocks)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .offset(y: 0) // Centered with the tab bar (changed from -22)
+                    .zIndex(1) // Ensure it's above the tab bar
             }
-            .frame(height: 51)
-            .background(
-                Rectangle()
-                    .fill(colorScheme == .dark ? Color.black : Color(.systemGray6))
-            )
-            .edgesIgnoringSafeArea(.bottom)
-            .onAppear {
-                AppTheme.shared.updateColorScheme(colorScheme)
-            }
-            .onChange(of: colorScheme) { _, newValue in
-                AppTheme.shared.updateColorScheme(newValue)
-            }
+        }
+        .onAppear {
+            AppTheme.shared.updateColorScheme(colorScheme)
+        }
+        .onChange(of: colorScheme) { _, newValue in
+            AppTheme.shared.updateColorScheme(newValue)
         }
     }
     
@@ -211,7 +220,6 @@ struct CustomTabBar: View {
                     .foregroundColor(colorScheme == .dark ? .black : .white)
             }
         }
-        .offset(y: -2) // Smaller offset since the button is smaller
         .accessibilityLabel("Start focus session")
     }
     
@@ -219,24 +227,50 @@ struct CustomTabBar: View {
         Button {
             if selectedTab != tab {
                 HapticManager.shared.selectionChanged()
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    selectedTab = tab
+                
+                // If switching to Statistics tab, close sidebar if open
+                if tab == .statistics && appState.showingSidebar {
+                    appState.showingSidebar = false
                 }
+                
+                // Simple direct tab change
+                selectedTab = tab
             }
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: selectedTab == tab ? tab.selectedIcon : tab.icon)
-                    .font(.system(size: 20))
+                    .font(.system(size: 22, weight: .regular))
                 
                 Text(tab.title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 10, weight: .medium))
             }
             .foregroundColor(selectedTab == tab ? 
-                             AppTheme.shared.activeColor : // Use AppTheme's colors
-                             AppTheme.shared.inactiveColor)
-            .frame(maxWidth: .infinity)
+                            AppTheme.shared.activeColor : // Use AppTheme's colors
+                            AppTheme.shared.inactiveColor)
+            .contentShape(Rectangle())
         }
         .accessibilityLabel(tab.title)
+    }
+}
+
+// MARK: - App State
+class AppState: ObservableObject {
+    @Published var selectedTab: Tab = .today
+    @Published var sidebarSelection: SidebarSelection = .today
+    @Published var selectedProject: Project?
+    @Published var showingSidebar = false
+    
+    // Method to navigate directly to Statistics tab
+    func navigateToStatistics() {
+        print("AppState: Direct navigation to Statistics tab requested")
+        
+        // Close sidebar if open
+        if showingSidebar {
+            showingSidebar = false
+        }
+        
+        // Direct tab change
+        selectedTab = .statistics
     }
 }
 
@@ -247,16 +281,18 @@ struct ZenithApp: App {
     @StateObject private var focusViewModel = FocusSessionViewModel()
     @StateObject private var projectViewModel = ProjectViewModel()
     @StateObject private var keyboardHandler = KeyboardHeightHandler() // Track keyboard
-    @State private var selectedTab: Tab = .today
+    @StateObject private var appState = AppState()
     @Environment(\.colorScheme) var colorScheme
-    @State private var showingSidebar = false
-    @State private var selectedProject: Project?
     @State private var chatInputRef: GlobalChatInput? = nil
     
     var body: some Scene {
         WindowGroup {
             GeometryReader { geometry in
                 ZStack {
+                    // Apply background color to the entire screen including safe areas
+                    Color(colorScheme == .dark ? .black : Color(hex: "F1F2F4"))
+                        .ignoresSafeArea()
+                    
                     // Background tap recognizer to dismiss keyboard
                     Color.clear
                         .contentShape(Rectangle())
@@ -265,49 +301,74 @@ struct ZenithApp: App {
                         }
                         .ignoresSafeArea()
                     
-                    // Main content area
-                    Group {
-                        switch selectedTab {
-                        case .today:
-                            MainView(
-                                showingSidebar: $showingSidebar,
-                                selectedProject: $selectedProject
-                            )
-                                .environmentObject(taskViewModel)
-                                .environmentObject(focusViewModel)
-                                .environmentObject(projectViewModel)
-                        case .blocks:
+                    // Main content area with tab bar
+                    ZStack {
+                        // Main content - each tab gets its own NavigationStack
+                        TabView(selection: $appState.selectedTab) {
+                            // Today tab with all its possible views
                             NavigationStack {
-                                BlocksView(showingSidebar: $showingSidebar)
+                                ZStack {
+                                    // Background color should extend to edges
+                                    Color(colorScheme == .dark ? .black : Color(hex: "F1F2F4"))
+                                        .ignoresSafeArea()
+                                        
+                                    switch appState.sidebarSelection {
+                                    case .today:
+                                        MainView(
+                                            showingSidebar: $appState.showingSidebar,
+                                            selectedProject: $appState.selectedProject
+                                        )
+                                            .environmentObject(taskViewModel)
+                                            .environmentObject(focusViewModel)
+                                            .environmentObject(projectViewModel)
+                                            .environmentObject(appState)
+                                    case .inbox(let project):
+                                        MainView(
+                                            showingSidebar: $appState.showingSidebar,
+                                            selectedProject: $appState.selectedProject
+                                        )
+                                            .environmentObject(taskViewModel)
+                                            .environmentObject(focusViewModel)
+                                            .environmentObject(projectViewModel)
+                                            .environmentObject(appState)
+                                    case .blocks:
+                                        BlocksView(showingSidebar: $appState.showingSidebar)
+                                            .environmentObject(projectViewModel)
+                                            .environmentObject(focusViewModel)
+                                            .environmentObject(appState)
+                                    case .project(let project):
+                                        MainView(
+                                            showingSidebar: $appState.showingSidebar,
+                                            selectedProject: $appState.selectedProject
+                                        )
+                                            .environmentObject(taskViewModel)
+                                            .environmentObject(focusViewModel)
+                                            .environmentObject(projectViewModel)
+                                            .environmentObject(appState)
+                                    }
+                                }
+                            }
+                            .tag(Tab.today)
+                            .tabItem { EmptyView() } // Use our custom tab bar instead
+                            
+                            // Statistics tab - separate NavigationStack
+                            NavigationStack {
+                                StatisticsView(showingSidebar: $appState.showingSidebar)
                                     .environmentObject(projectViewModel)
                                     .environmentObject(focusViewModel)
+                                    .environmentObject(appState)
                             }
-                            .transition(.opacity)
-                            .onAppear {
-                                // Clear selected project when switching to Blocks tab
-                                selectedProject = nil
-                            }
+                            .tag(Tab.statistics)
+                            .tabItem { EmptyView() } // Use our custom tab bar instead
                         }
-                    }
-                    .safeAreaInset(edge: .bottom) {
-                        Color.clear.frame(height: 51) // Reserve space for tab bar
-                    }
-                    .zIndex(0) // Base layer
-                    
-                    // Bottom bar layers in z-order
-                    
-                    // Tab bar - always stays at bottom
-                    VStack(spacing: 0) {
-                        Spacer()
-                        CustomTabBar(selectedTab: $selectedTab, focusViewModel: focusViewModel)
-                            .frame(height: 51)
-                            .background(
-                                Rectangle()
-                                    .fill(colorScheme == .dark ? Color.black : Color(.systemGray6))
-                            )
-                    }
-                    .zIndex(10) // Always on top of content
-                    .ignoresSafeArea(.keyboard, edges: .bottom) // Stay fixed at bottom
+                        .tabViewStyle(.page(indexDisplayMode: .never)) // Hide default tab UI
+                        .animation(.easeInOut, value: appState.selectedTab)
+                        // Add safe area inset for the tab bar - this properly handles the home indicator
+                        .safeAreaInset(edge: .bottom) {
+                            CustomTabBar(selectedTab: $appState.selectedTab, focusViewModel: focusViewModel)
+                                .environmentObject(appState)
+                        }
+                    } // End of main ZStack for tab content and tab bar
                     
                     // Chat input - positioned directly above tab bar
                     if !focusViewModel.isActive && !focusViewModel.isExpanded {
@@ -317,20 +378,20 @@ struct ZenithApp: App {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                             
                             GlobalChatInput(taskViewModel: taskViewModel)
-                                .padding(.bottom, keyboardHandler.keyboardHeight > 0 ? 0 : 51)
+                                .padding(.bottom, keyboardHandler.keyboardHeight > 0 ? 0 : 55) // Standard tab height
                                 .offset(y: keyboardHandler.keyboardHeight > 0 ? geometry.size.height - keyboardHandler.keyboardHeight - 124 : 0)
                                 .animation(
                                     .interpolatingSpring(
-                                        mass: 0.6,  // Reduced mass for faster response
-                                        stiffness: 140,  // Increased stiffness
-                                        damping: 12.0,  // Slightly reduced damping
+                                        mass: 0.6,
+                                        stiffness: 140,
+                                        damping: 12.0,
                                         initialVelocity: 0
                                     ),
                                     value: keyboardHandler.keyboardHeight
                                 )
                         }
+                        .zIndex(10)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .zIndex(20) // Above tab bar
                     }
                     
                     // Minimized Focus Session 
@@ -348,9 +409,8 @@ struct ZenithApp: App {
                                 Rectangle()
                                     .fill(colorScheme == .dark ? Color.black : Color(.systemGray6))
                             )
-                            .padding(.bottom, 51) // Space for tab bar
+                            .padding(.bottom, 49) // Standard tab height
                         }
-                        .zIndex(30) // Above chat input
                     }
                     
                     // Undo toast
@@ -371,10 +431,9 @@ struct ZenithApp: App {
                                 },
                                 isPresented: $taskViewModel.showingUndoToast
                             )
-                            .padding(.bottom, 71) // Position above tab bar
+                            .padding(.bottom, 60) // Just above the tab bar
                         }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .zIndex(40) // Above minimized focus
                     }
                     
                     // Full-screen focus session overlay
@@ -386,75 +445,81 @@ struct ZenithApp: App {
                                 insertion: .move(edge: .bottom).combined(with: .opacity),
                                 removal: .move(edge: .bottom).combined(with: .opacity)
                             ))
-                            .zIndex(50) // Above toast
                     }
                     
                     // Sidebar overlay
-                    if showingSidebar {
+                    if appState.showingSidebar {
                         // Background dim overlay (without move transition)
                         Color.black.opacity(0.4)
                             .ignoresSafeArea()
                             .onTapGesture {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    showingSidebar = false
+                                    appState.showingSidebar = false
                                     HapticManager.shared.impact(style: .light)
                                 }
                             }
                             .transition(.opacity)
-                            .zIndex(60)
                         
                         // Sidebar content (with move transition)
                         ZStack(alignment: .leading) {
                             SidebarMenu(
                                 taskViewModel: taskViewModel,
-                                isShowingSidebar: $showingSidebar,
-                                selectedProject: $selectedProject
+                                isShowingSidebar: $appState.showingSidebar,
+                                selectedProject: $appState.selectedProject,
+                                sidebarSelection: $appState.sidebarSelection
                             )
                             .environmentObject(projectViewModel)
+                            .environmentObject(appState)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .transition(.move(edge: .leading))
-                        .zIndex(61) // Slightly higher than the background
                     }
-                }
-                // Add tap gesture to dismiss keyboard at ZStack level for better coverage
-                .simultaneousGesture(
-                    TapGesture()
-                        .onEnded { _ in
-                            // Only dismiss keyboard if it's shown (performance optimization)
-                            if keyboardHandler.keyboardHeight > 0 {
-                                hideKeyboard()
-                            }
-                        }
-                )
+                } // End of outer ZStack for all UI elements
                 .onChange(of: colorScheme) { _, newValue in
                     // Update AppTheme at the app level as well
                     AppTheme.shared.updateColorScheme(newValue)
                 }
-                .onChange(of: showingSidebar) { _, newValue in
+                .onChange(of: appState.showingSidebar) { _, newValue in
                     // Add haptic feedback when sidebar state changes
                     if newValue {
                         // Sidebar is being opened
                         HapticManager.shared.impact(style: .medium)
                     }
                 }
-                .onChange(of: selectedTab) { _, newValue in
-                    // Clear selected project when switching to Blocks tab
-                    if newValue == .blocks {
-                        selectedProject = nil
+                .onChange(of: appState.selectedTab) { oldValue, newValue in
+                    print("Tab changed from \(oldValue) to \(newValue)")
+                    
+                    // Simple operations to ensure clean state when needed
+                    if newValue == .statistics && appState.showingSidebar {
+                        appState.showingSidebar = false
+                    }
+                }
+                .onChange(of: appState.sidebarSelection) { oldValue, newValue in
+                    print("Sidebar selection changed from \(oldValue) to \(newValue)")
+                    
+                    // Update selectedProject based on sidebarSelection
+                    switch newValue {
+                    case .today:
+                        appState.selectedProject = nil
+                    case .inbox(let project):
+                        appState.selectedProject = project
+                    case .blocks:
+                        appState.selectedProject = nil
+                    case .project(let project):
+                        appState.selectedProject = project
                     }
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.9), value: focusViewModel.isExpanded)
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingSidebar)
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: appState.showingSidebar)
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: taskViewModel.showingUndoToast)
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: focusViewModel.isActive)
-            }
+            } // End of GeometryReader
             .task {
                 // Preload projects when app starts
                 await preloadData()
             }
-        }
-    }
+        } // End of WindowGroup
+    } // End of var body
     
     // Method to dismiss keyboard
     private func hideKeyboard() {
@@ -481,7 +546,7 @@ struct ZenithApp: App {
             value = nextValue()
         }
     }
-}
+} // End of ZenithApp
 
 // MARK: - Preview Provider
 struct ZenithApp_Previews: PreviewProvider {
@@ -489,6 +554,8 @@ struct ZenithApp_Previews: PreviewProvider {
         VStack {
             Spacer()
             CustomTabBar(selectedTab: .constant(.today), focusViewModel: FocusSessionViewModel())
+                .environmentObject(AppState())
         }
     }
 }
+
