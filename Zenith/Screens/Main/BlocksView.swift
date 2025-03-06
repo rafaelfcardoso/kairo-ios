@@ -29,6 +29,10 @@ struct BlocksView: View {
             // Content
             ScrollView {
                 VStack(spacing: 20) {
+                    // Empty spacer to push content below navigation bar
+                    Spacer()
+                        .frame(height: 20)
+                    
                     // Shield status card
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
@@ -165,7 +169,13 @@ struct BlocksView: View {
                     .cornerRadius(12)
                     .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 5, x: 0, y: 2)
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 20)
+            }
+            .scrollIndicators(.hidden)
+            .safeAreaInset(edge: .top) {
+                Color.clear.frame(height: 8)
             }
         }
         .navigationTitle("Blocos")
@@ -181,32 +191,13 @@ struct BlocksView: View {
                     Image(systemName: "line.3.horizontal")
                         .font(.title3)
                         .foregroundColor(textColor)
+                        .padding(.horizontal, 4)
                 }
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 16) {
-                    // Statistics button
-                    Button {
-                        // Direct tab change
-                        print("BlocksView: Statistics button tapped")
-                        
-                        // Close sidebar if open
-                        if appState.showingSidebar {
-                            appState.showingSidebar = false
-                        }
-                        
-                        // Switch tab directly
-                        appState.selectedTab = .statistics
-                    } label: {
-                        Image(systemName: "chart.bar")
-                            .font(.title3)
-                            .foregroundColor(textColor)
-                    }
-                    
-                    // Settings button
-                    settingsButton
-                }
+                settingsButton
+                    .padding(.horizontal, 4)
             }
         }
         .refreshable {
@@ -219,7 +210,10 @@ struct BlocksView: View {
             Image(systemName: "gear")
                 .font(.title3)
                 .foregroundColor(textColor)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
+        .accessibilityLabel("Settings")
     }
 }
 

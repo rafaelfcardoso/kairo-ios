@@ -285,6 +285,18 @@ struct ZenithApp: App {
     @Environment(\.colorScheme) var colorScheme
     @State private var chatInputRef: GlobalChatInput? = nil
     
+    init() {
+        // Configure navigation bar and status bar appearance for consistent translucent effect
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+        
+        // Apply to all navigation bars in the app
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+    }
+    
     var body: some Scene {
         WindowGroup {
             GeometryReader { geometry in
@@ -322,7 +334,7 @@ struct ZenithApp: App {
                                             .environmentObject(focusViewModel)
                                             .environmentObject(projectViewModel)
                                             .environmentObject(appState)
-                                    case .inbox(let project):
+                                    case .inbox(_):
                                         MainView(
                                             showingSidebar: $appState.showingSidebar,
                                             selectedProject: $appState.selectedProject
@@ -336,7 +348,7 @@ struct ZenithApp: App {
                                             .environmentObject(projectViewModel)
                                             .environmentObject(focusViewModel)
                                             .environmentObject(appState)
-                                    case .project(let project):
+                                    case .project(_):
                                         MainView(
                                             showingSidebar: $appState.showingSidebar,
                                             selectedProject: $appState.selectedProject
@@ -378,7 +390,7 @@ struct ZenithApp: App {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                             
                             GlobalChatInput(taskViewModel: taskViewModel)
-                                .padding(.bottom, keyboardHandler.keyboardHeight > 0 ? 0 : 55) // Standard tab height
+                                .padding(.bottom, keyboardHandler.keyboardHeight > 0 ? 0 : 49) // Exact tab height with no gap
                                 .offset(y: keyboardHandler.keyboardHeight > 0 ? geometry.size.height - keyboardHandler.keyboardHeight - 124 : 0)
                                 .animation(
                                     .interpolatingSpring(
