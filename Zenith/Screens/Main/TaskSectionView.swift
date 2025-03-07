@@ -59,7 +59,7 @@ struct TaskSectionView: View {
                         .font(.subheadline)
                         .foregroundColor(secondaryTextColor)
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 16)
                 .padding(.top, 24)
                 
                 TaskListView(

@@ -14,7 +14,6 @@ class TaskViewModel: ObservableObject {
     @Published var lastCompletedTaskTitle: String = ""
     @Published var timeWorkedToday: TimeInterval = 0
     @Published var focusSessionHistory: [(date: Date, duration: TimeInterval)] = []
-    @Published var isOfflineMode = false
     @Published var lastSuccessfulSync: Date? = nil
     
     private let baseURL = APIConfig.baseURL
@@ -23,8 +22,6 @@ class TaskViewModel: ObservableObject {
     private let cacheTimeout: TimeInterval = 120 // 120 seconds cache
     private var lastOverdueFetchTime: Date?  // Add this for overdue tasks cache
     private var lastCompletedTask: TodoTask? // Store the last completed task for undo
-    private var offlineTasksCache: [TodoTask] = []
-    private var offlineOverdueTasksCache: [TodoTask] = []
     
     // Keys for UserDefaults
     private let tasksCacheKey = "cached_tasks"
@@ -145,22 +142,22 @@ class TaskViewModel: ObservableObject {
         let encoder = JSONEncoder()
         
         // Save tasks cache
-        if !offlineTasksCache.isEmpty {
+        if !tasks.isEmpty {
             do {
-                let data = try encoder.encode(offlineTasksCache)
+                let data = try encoder.encode(tasks)
                 UserDefaults.standard.set(data, forKey: tasksCacheKey)
-                print("🌐 [Tasks] Saved \(offlineTasksCache.count) tasks to local cache")
+                print("🌐 [Tasks] Saved \(tasks.count) tasks to local cache")
             } catch {
                 print("🌐 [Tasks] Error saving tasks to cache: \(error)")
             }
         }
         
         // Save overdue tasks cache
-        if !offlineOverdueTasksCache.isEmpty {
+        if !overdueTasks.isEmpty {
             do {
-                let data = try encoder.encode(offlineOverdueTasksCache)
+                let data = try encoder.encode(overdueTasks)
                 UserDefaults.standard.set(data, forKey: overdueTasksCacheKey)
-                print("🌐 [Tasks] Saved \(offlineOverdueTasksCache.count) overdue tasks to local cache")
+                print("🌐 [Tasks] Saved \(overdueTasks.count) overdue tasks to local cache")
             } catch {
                 print("🌐 [Tasks] Error saving overdue tasks to cache: \(error)")
             }
@@ -180,12 +177,11 @@ class TaskViewModel: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: tasksCacheKey) {
             do {
                 let cachedTasks = try decoder.decode([TodoTask].self, from: data)
-                self.offlineTasksCache = cachedTasks
+                self.tasks = cachedTasks
                 
                 // If we have cached tasks, use them initially
                 if !cachedTasks.isEmpty && self.tasks.isEmpty {
                     self.tasks = cachedTasks
-                    self.isOfflineMode = true
                     print("🌐 [Tasks] Loaded \(cachedTasks.count) tasks from local cache")
                 }
             } catch {
@@ -197,12 +193,11 @@ class TaskViewModel: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: overdueTasksCacheKey) {
             do {
                 let cachedOverdueTasks = try decoder.decode([TodoTask].self, from: data)
-                self.offlineOverdueTasksCache = cachedOverdueTasks
+                self.overdueTasks = cachedOverdueTasks
                 
                 // If we have cached overdue tasks, use them initially
                 if !cachedOverdueTasks.isEmpty && self.overdueTasks.isEmpty {
                     self.overdueTasks = cachedOverdueTasks
-                    self.isOfflineMode = true
                     print("🌐 [Tasks] Loaded \(cachedOverdueTasks.count) overdue tasks from local cache")
                 }
             } catch {
@@ -267,12 +262,8 @@ class TaskViewModel: ObservableObject {
                 }
                 
                 // Store in offline cache
-                self.offlineTasksCache = decodedTasks
+                self.tasks = decodedTasks
                 self.lastFetchTime = Date()
-                self.isOfflineMode = false
-                
-                // Save to disk
-                saveOfflineCacheToDisk()
                 
                 // Process tasks to avoid duplicates between overdue and today's tasks
                 await MainActor.run {
@@ -329,9 +320,8 @@ class TaskViewModel: ObservableObject {
                 print("🌐 [Tasks] Error loading tasks: \(error.localizedDescription)")
                 
                 // Switch to offline mode if we have cached data
-                if !self.offlineTasksCache.isEmpty {
-                    print("🌐 [Tasks] Switching to offline mode with \(self.offlineTasksCache.count) cached tasks")
-                    self.isOfflineMode = true
+                if !self.tasks.isEmpty {
+                    print("🌐 [Tasks] Switching to offline mode with \(self.tasks.count) cached tasks")
                     
                     if forToday {
                         // Filter cached tasks for today
@@ -341,7 +331,7 @@ class TaskViewModel: ObservableObject {
                         dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                         
                         let specificTaskID = "91056be9-f329-4d22-8626-eef4a0f3b19d"
-                        tasks = self.offlineTasksCache.filter { task in
+                        tasks = self.tasks.filter { task in
                             // Special case for the specific task
                             if task.id == specificTaskID {
                                 print("🌐 [Tasks] Found the specific task: \(task.title) - Including in today's tasks")
@@ -372,7 +362,7 @@ class TaskViewModel: ObservableObject {
                             return isToday
                         }
                     } else {
-                        tasks = self.offlineTasksCache
+                        tasks = self.tasks
                     }
                 } else {
                     // No cached data available, propagate the error
@@ -598,22 +588,16 @@ class TaskViewModel: ObservableObject {
             // Update the overdue tasks collection
             overdueTasks = uniqueOverdueTasks
             
-            self.offlineOverdueTasksCache = overdueTasks
             self.lastOverdueFetchTime = Date()
-            self.isOfflineMode = false
-            
-            // Save to disk
-            saveOfflineCacheToDisk()
             
             print("🌐 [Tasks] Successfully loaded \(overdueTasks.count) overdue tasks")
         } catch {
             print("🌐 [Tasks] Error loading overdue tasks: \(error.localizedDescription)")
             
             // Switch to offline mode if we have cached data
-            if !self.offlineOverdueTasksCache.isEmpty {
-                print("🌐 [Tasks] Switching to offline mode with \(self.offlineOverdueTasksCache.count) cached overdue tasks")
-                self.isOfflineMode = true
-                overdueTasks = self.offlineOverdueTasksCache
+            if !self.overdueTasks.isEmpty {
+                print("🌐 [Tasks] Switching to offline mode with \(self.overdueTasks.count) cached overdue tasks")
+                overdueTasks = self.overdueTasks
             } else {
                 // No cached data available, propagate the error
                 if let apiError = error as? APIError {

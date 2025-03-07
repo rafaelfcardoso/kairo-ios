@@ -18,22 +18,22 @@ struct TaskListView: View {
                     TaskRow(task: task, viewModel: viewModel, isOverdue: isOverdueSection)
                 }
                 
-                Button(action: {
-                    showingCreateTask = true
-                }) {
-                    HStack {
-                        Image(systemName: "plus")
-                        Text("Adicionar tarefa")
-                    }
-                    .foregroundColor(secondaryTextColor)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(cardBackgroundColor)
-                    .cornerRadius(12)
-                }
-                .accessibilityIdentifier("add-task-button")
+                // Button(action: {
+                //     showingCreateTask = true
+                // }) {
+                //     HStack {
+                //         Image(systemName: "plus")
+                //         Text("Adicionar tarefa")
+                //     }
+                //     .foregroundColor(secondaryTextColor)
+                //     .frame(maxWidth: .infinity, alignment: .leading)
+                //     .padding()
+                //     .background(cardBackgroundColor)
+                //     .cornerRadius(12)
+                // }
+                // .accessibilityIdentifier("add-task-button")
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 16)
         }
         .task(id: shouldRefresh) {
             if shouldRefresh {

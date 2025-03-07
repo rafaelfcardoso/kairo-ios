@@ -15,15 +15,14 @@ struct ErrorView: View {
     let textColor: Color
     let retryAction: () -> Void
     var errorMessage: String? = nil
-    var isOfflineMode: Bool = false
     
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: isOfflineMode ? "wifi.slash" : "exclamationmark.triangle")
+            Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 40))
                 .foregroundColor(secondaryTextColor)
             
-            Text(isOfflineMode ? "Modo Offline" : "Não foi possível carregar as tarefas")
+            Text("Não foi possível carregar as tarefas")
                 .font(.headline)
                 .foregroundColor(textColor)
             
@@ -34,9 +33,7 @@ struct ErrorView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             } else {
-                Text(isOfflineMode ? 
-                     "Você está trabalhando offline. Algumas funcionalidades podem estar limitadas." : 
-                     "Verifique sua conexão e tente novamente")
+                Text("Verifique sua conexão e tente novamente")
                     .font(.subheadline)
                     .foregroundColor(secondaryTextColor)
                     .multilineTextAlignment(.center)
@@ -47,23 +44,10 @@ struct ErrorView: View {
                     .foregroundColor(.blue)
             }
             .padding(.top, 8)
-            
-            if isOfflineMode {
-                Text("Última atualização: \(formattedLastUpdate)")
-                    .font(.caption)
-                    .foregroundColor(secondaryTextColor)
-            }
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
-    }
-    
-    private var formattedLastUpdate: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
-        return formatter.string(from: Date())
     }
 }
 
@@ -163,7 +147,7 @@ struct MainView: View {
                     if viewModel.isLoading {
                         ProgressView()
                             .padding(.top, 100)
-                    } else if hasError && !viewModel.isOfflineMode {
+                    } else if hasError {
                         ErrorView(
                             secondaryTextColor: secondaryTextColor,
                             textColor: textColor,
@@ -174,45 +158,6 @@ struct MainView: View {
                             },
                             errorMessage: errorMessage
                         )
-                    } else if viewModel.isOfflineMode {
-                        VStack {
-                            // Offline banner
-                            HStack {
-                                Image(systemName: "wifi.slash")
-                                    .foregroundColor(secondaryTextColor)
-                                Text("Modo Offline")
-                                    .font(.subheadline)
-                                    .foregroundColor(secondaryTextColor)
-                                Spacer()
-                                Button("Reconectar") {
-                                    Task {
-                                        await performTaskLoad()
-                                    }
-                                }
-                                .font(.subheadline)
-                                .foregroundColor(.blue)
-                            }
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                            .padding(.top)
-                            
-                            // Show cached content
-                            TaskContentView(
-                                selectedProject: $selectedProject,
-                                selectedTab: $selectedTab,
-                                viewModel: viewModel,
-                                showingCreateTask: $showingCreateTask,
-                                secondaryTextColor: secondaryTextColor,
-                                cardBackgroundColor: cardBackgroundColor,
-                                displayedTasks: displayedTasks,
-                                onLoadTasks: { @Sendable in
-                                    await self.performTaskLoad()
-                                }
-                            )
-                        }
                     } else {
                         TaskContentView(
                             selectedProject: $selectedProject,

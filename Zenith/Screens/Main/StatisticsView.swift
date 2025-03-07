@@ -23,11 +23,9 @@ struct StatisticsView: View {
     }
     
     var body: some View {
-        ZStack {
+        // Using VStack instead of ZStack for better navigation layout control
+        VStack(spacing: 0) {
             // Background
-            backgroundColor.ignoresSafeArea()
-            
-            // Content
             ScrollView {
                 VStack(spacing: 20) {
                     InsightsDashboard(
@@ -58,16 +56,27 @@ struct StatisticsView: View {
                         savedTimeTrend: viewModel.savedTimeTrend
                     )
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 20)
+                .padding(.top, 24)  // Add proper top padding to avoid toolbar overlap
             }
+            .scrollIndicators(.hidden)
         }
+        .safeAreaInset(edge: .top) {
+            // Add an empty spacer to ensure content respects the navigation bar
+            Color.clear.frame(height: 16)  // Proper spacing for navigation bar
+        }
+        .background(backgroundColor.ignoresSafeArea())
         .navigationTitle("Estatísticas")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 settingsButton
+                    .padding(.horizontal, 4)
             }
         }
+        .toolbarBackground(backgroundColor, for: .navigationBar)  // Set navigation bar background
+        .toolbarBackground(.visible, for: .navigationBar)  // Make navigation bar background visible
         .refreshable {
             await viewModel.refreshData()
         }
@@ -78,7 +87,10 @@ struct StatisticsView: View {
             Image(systemName: "gear")
                 .font(.title3)
                 .foregroundColor(textColor)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
+        .accessibilityLabel("Settings")
     }
 }
 

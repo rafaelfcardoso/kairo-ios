@@ -34,131 +34,60 @@ struct ProjectTasksView: View {
             if isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if hasError && !taskViewModel.isOfflineMode {
+            } else if hasError {
                 ErrorView(
                     secondaryTextColor: secondaryTextColor,
                     textColor: textColor,
                     retryAction: loadProjectTasks,
                     errorMessage: errorMessage
                 )
-            } else if taskViewModel.isOfflineMode {
-                VStack(spacing: 0) {
-                    // Offline banner
-                    HStack {
-                        Image(systemName: "wifi.slash")
-                            .foregroundColor(secondaryTextColor)
-                        Text("Modo Offline")
+            } else {
+                if projectTasks.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(Color(hex: project.color))
+                        
+                        Text("Nenhuma tarefa")
+                            .font(.headline)
+                            .foregroundColor(textColor)
+                        
+                        Text("Este projeto ainda não possui tarefas")
                             .font(.subheadline)
                             .foregroundColor(secondaryTextColor)
-                        Spacer()
-                        Button("Reconectar") {
-                            loadProjectTasks()
-                        }
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-                    .padding(.horizontal)
-                    .padding(.top)
-                    
-                    if projectTasks.isEmpty {
-                        VStack(spacing: 16) {
-                            Spacer()
-                            Image(systemName: "folder.fill")
-                                .font(.system(size: 40))
-                                .foregroundColor(Color(hex: project.color))
-                            
-                            Text("Nenhuma tarefa")
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                        
+                        Button {
+                            showingCreateTask = true
+                        } label: {
+                            Text("Criar tarefa")
                                 .font(.headline)
-                                .foregroundColor(textColor)
-                            
-                            Text("Este projeto ainda não possui tarefas")
-                                .font(.subheadline)
-                                .foregroundColor(secondaryTextColor)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 32)
-                            
-                            Button {
-                                showingCreateTask = true
-                            } label: {
-                                Text("Criar tarefa")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 10)
-                                    .background(Color.blue)
-                                    .cornerRadius(8)
-                            }
-                            .padding(.top, 8)
-                            Spacer()
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(Color.blue)
+                                .cornerRadius(8)
                         }
-                        .padding()
-                    } else {
-                        ScrollView {
-                            VStack(spacing: 12) {
-                                ForEach(projectTasks) { task in
-                                    TaskRow(
-                                        task: task,
-                                        viewModel: taskViewModel,
-                                        isOverdue: false
-                                    )
-                                }
-                            }
-                            .padding()
-                        }
-                        .refreshable {
-                            loadProjectTasks()
-                        }
-                    }
-                }
-            } else if projectTasks.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(Color(hex: project.color))
-                    
-                    Text("Nenhuma tarefa")
-                        .font(.headline)
-                        .foregroundColor(textColor)
-                    
-                    Text("Este projeto ainda não possui tarefas")
-                        .font(.subheadline)
-                        .foregroundColor(secondaryTextColor)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                    
-                    Button {
-                        showingCreateTask = true
-                    } label: {
-                        Text("Criar tarefa")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(Color.blue)
-                            .cornerRadius(8)
-                    }
-                    .padding(.top, 8)
-                }
-                .padding()
-            } else {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        ForEach(projectTasks) { task in
-                            TaskRow(
-                                task: task,
-                                viewModel: taskViewModel,
-                                isOverdue: false
-                            )
-                        }
+                        .padding(.top, 8)
                     }
                     .padding()
-                }
-                .refreshable {
-                    loadProjectTasks()
+                } else {
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            ForEach(projectTasks) { task in
+                                TaskRow(
+                                    task: task,
+                                    viewModel: taskViewModel,
+                                    isOverdue: false
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                    .refreshable {
+                        loadProjectTasks()
+                    }
                 }
             }
         }

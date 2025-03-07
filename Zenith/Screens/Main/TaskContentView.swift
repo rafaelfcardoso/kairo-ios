@@ -103,7 +103,6 @@ struct TaskContentView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .padding(.top, 12)
-                .contentMargins(.horizontal, 16, for: .scrollContent)
                 // Add this to create a fixed bottom indicator area
                 .safeAreaInset(edge: .bottom) {
                     // This creates a fixed space at the bottom
@@ -139,7 +138,6 @@ struct TaskContentView: View {
                     await handleRefresh()
                 }
                 .padding(.top, 12)
-                .contentMargins(.horizontal, 16, for: .scrollContent)
             }
         }
     }
