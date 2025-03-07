@@ -1,4 +1,54 @@
 import SwiftUI
+import Combine
+import UIKit
+
+class KeyboardObserver: ObservableObject {
+    @Published var isVisible = false
+    
+    init() {
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide), name: UIResponder.keyboardWillHideNotification, object: nil)
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    @objc func keyboardWillShow(notification: NSNotification) {
+        isVisible = true
+    }
+    
+    @objc func keyboardWillHide() {
+        isVisible = false
+    }
+}
+
+// Simple page indicator with dots
+struct PageControl: View {
+    let numberOfPages: Int
+    @Binding var currentPage: Int
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<numberOfPages, id: \.self) { index in
+                Circle()
+                    .fill(currentPage == index ? 
+                          (colorScheme == .dark ? Color.white : Color.black) : 
+                          Color.gray.opacity(0.3))
+                    .frame(width: 8, height: 8)
+                    .animation(.easeInOut, value: currentPage)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(Color(UIColor.systemBackground).opacity(0.9))
+                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+        )
+    }
+}
 
 struct TaskContentView: View {
     @Binding var selectedProject: Project?
@@ -9,6 +59,7 @@ struct TaskContentView: View {
     let cardBackgroundColor: Color
     let displayedTasks: [TodoTask]
     let onLoadTasks: @Sendable () async -> Void
+    @StateObject private var keyboardObserver = KeyboardObserver()
     
     var body: some View {
         VStack(spacing: 0) {
@@ -50,14 +101,27 @@ struct TaskContentView: View {
                         await handleRefresh()
                     }
                 }
-                .tabViewStyle(.page)
-                .indexViewStyle(.page(backgroundDisplayMode: .always))
+                .tabViewStyle(.page(indexDisplayMode: .never))
                 .padding(.top, 12)
                 .contentMargins(.horizontal, 16, for: .scrollContent)
+                // Add this to create a fixed bottom indicator area
                 .safeAreaInset(edge: .bottom) {
-                    // Add bottom padding to ensure the page indicator isn't covered by chat input
-                    Color.clear.frame(height: 50)
+                    // This creates a fixed space at the bottom
+                    VStack {
+                        Spacer()
+                            .frame(height: shouldShowPageIndicator ? 40 : 0)
+                    }
+                    .animation(.none, value: keyboardObserver.isVisible)
                 }
+                .overlay(alignment: .bottom) {
+                    // The page indicator is ALWAYS here at exactly the same position,
+                    // only its opacity changes
+                    PageControl(numberOfPages: 2, currentPage: $selectedTab)
+                        .padding(.bottom, 60)
+                        .opacity(shouldShowPageIndicator ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.2), value: keyboardObserver.isVisible)
+                }
+                .ignoresSafeArea(.keyboard)
             } else {
                 TaskSectionView(
                     title: selectedProject?.name ?? getFilterTitle(),
@@ -78,6 +142,11 @@ struct TaskContentView: View {
                 .contentMargins(.horizontal, 16, for: .scrollContent)
             }
         }
+    }
+    
+    // Computed property to check if we should show the page indicator
+    private var shouldShowPageIndicator: Bool {
+        return selectedProject == nil && !viewModel.overdueTasks.isEmpty && !keyboardObserver.isVisible
     }
     
     // Helper function to get the title based on the current filter

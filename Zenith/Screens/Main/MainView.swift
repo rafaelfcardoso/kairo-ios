@@ -230,7 +230,7 @@ struct MainView: View {
                 }
                 .safeAreaInset(edge: .top) {
                     // Add an empty spacer to ensure content respects the navigation bar
-                    Color.clear.frame(height: 8)  // Adjust height for more spacing
+                    Color.clear.frame(height: 16)  // Adjust height for more spacing
                 }
             }
             .navigationBarTitleDisplayMode(.inline)

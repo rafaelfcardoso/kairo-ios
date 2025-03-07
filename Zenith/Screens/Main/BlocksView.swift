@@ -22,17 +22,10 @@ struct BlocksView: View {
     }
     
     var body: some View {
-        ZStack {
-            // Background
-            backgroundColor.ignoresSafeArea()
-            
-            // Content
+        // Don't create a ZStack here - we're already in a ZStack from the parent NavigationStack
+        VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Empty spacer to push content below navigation bar - reduced since we have an opaque navbar
-                    Spacer()
-                        .frame(height: 20)
-                    
                     // Shield status card
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
@@ -170,10 +163,18 @@ struct BlocksView: View {
                     .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 5, x: 0, y: 2)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 24)
                 .padding(.bottom, 20)
+                // Increase top padding to ensure content doesn't get cut off by the navigation bar
+                .padding(.top, 32)
+            }
+            .refreshable {
+                await viewModel.refreshData()
             }
             .scrollIndicators(.hidden)
+        }
+        .safeAreaInset(edge: .top) {
+            // Add an empty spacer to ensure content respects the navigation bar
+            Color.clear.frame(height: 16)  // Increase the height for more spacing
         }
         .navigationTitle("Blocos")
         .navigationBarTitleDisplayMode(.inline)
@@ -197,9 +198,8 @@ struct BlocksView: View {
                     .padding(.horizontal, 4)
             }
         }
-        .refreshable {
-            await viewModel.refreshData()
-        }
+        .toolbarBackground(backgroundColor, for: .navigationBar)  // Set navigation bar background
+        .toolbarBackground(.visible, for: .navigationBar)  // Make navigation bar background visible
     }
     
     private var settingsButton: some View {

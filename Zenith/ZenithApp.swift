@@ -408,7 +408,7 @@ struct ZenithApp: App {
                                     value: keyboardHandler.keyboardHeight
                                 )
                         }
-                        .zIndex(10)
+                        .zIndex(appState.showingSidebar ? 1 : 10) // Lower z-index when sidebar is open
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                     
@@ -477,6 +477,7 @@ struct ZenithApp: App {
                                 }
                             }
                             .transition(.opacity)
+                            .zIndex(20) // Higher z-index for sidebar background
                         
                         // Sidebar content (with move transition)
                         ZStack(alignment: .leading) {
@@ -491,6 +492,7 @@ struct ZenithApp: App {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .transition(.move(edge: .leading))
+                        .zIndex(25) // Highest z-index for sidebar content
                     }
                 } // End of outer ZStack for all UI elements
                 .onChange(of: colorScheme) { _, newValue in
@@ -502,6 +504,11 @@ struct ZenithApp: App {
                     if newValue {
                         // Sidebar is being opened
                         HapticManager.shared.impact(style: .medium)
+                    }
+                    
+                    // Explicitly animate sidebar transitions
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        // This empty block ensures the animation is applied
                     }
                 }
                 .onChange(of: appState.selectedTab) { oldValue, newValue in
