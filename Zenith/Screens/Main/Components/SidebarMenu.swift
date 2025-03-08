@@ -87,7 +87,7 @@ struct SidebarMenu: View {
                         ) {
                             sidebarSelection = .today
                             selectedProject = nil
-                            withAnimation {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 isShowingSidebar = false
                             }
                         }
@@ -107,7 +107,7 @@ struct SidebarMenu: View {
                             ) {
                                 sidebarSelection = .inbox(inboxProject)
                                 selectedProject = inboxProject
-                                withAnimation {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                     isShowingSidebar = false
                                 }
                             }
@@ -121,7 +121,7 @@ struct SidebarMenu: View {
                         ) {
                             sidebarSelection = .blocks
                             selectedProject = nil
-                            withAnimation {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 isShowingSidebar = false
                             }
                         }
@@ -197,7 +197,7 @@ struct SidebarMenu: View {
                                 ) {
                                     sidebarSelection = .project(project)
                                     selectedProject = project
-                                    withAnimation {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                         isShowingSidebar = false
                                     }
                                 }

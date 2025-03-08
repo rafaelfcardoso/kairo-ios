@@ -230,11 +230,16 @@ struct CustomTabBar: View {
                 
                 // If switching to Statistics tab, close sidebar if open
                 if tab == .statistics && appState.showingSidebar {
-                    appState.showingSidebar = false
+                    // Use explicit animation for sidebar closing during tab changes
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        appState.showingSidebar = false
+                    }
                 }
                 
                 // Simple direct tab change
-                selectedTab = tab
+                withAnimation(.easeInOut) {
+                    selectedTab = tab
+                }
             }
         } label: {
             VStack(spacing: 4) {
@@ -266,11 +271,15 @@ class AppState: ObservableObject {
         
         // Close sidebar if open
         if showingSidebar {
-            showingSidebar = false
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                showingSidebar = false
+            }
         }
         
         // Direct tab change
-        selectedTab = .statistics
+        withAnimation(.easeInOut) {
+            selectedTab = .statistics
+        }
     }
 }
 
@@ -516,7 +525,10 @@ struct ZenithApp: App {
                     
                     // Simple operations to ensure clean state when needed
                     if newValue == .statistics && appState.showingSidebar {
-                        appState.showingSidebar = false
+                        // Use explicit animation when closing the sidebar during tab changes
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            appState.showingSidebar = false
+                        }
                     }
                 }
                 .onChange(of: appState.sidebarSelection) { oldValue, newValue in
