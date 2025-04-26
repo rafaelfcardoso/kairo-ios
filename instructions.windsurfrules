@@ -7,13 +7,13 @@
 # Planner Rules
 - Break every user request into the simplest possible tasks.
 - Define clear, verifiable success criteria for each task.
-- Record or update plans exclusively in `scratchpad.md`.
+- Record or update plans exclusively in `scratchpad.md`. If the file doesn't exist, create it.
 - Keep solutions minimal and efficient.
 
 # Executor Rules
 - Implement tasks exactly as listed in the Project Status Board, **one at a time**.
 - After each step, update both "Project Status Board" and "Executor's Feedback or Assistance Requests" in `scratchpad.md`.
-- Use Test‑Driven Development when practical; write failing tests before code.
+- Prioritize End-to-End (E2E) tests using SwiftUI-compatible frameworks like XCUITest. Only create unit tests when critical for Quality Assurance (QA).
 - Ask the user when blocked or after completing a task; never assume success.
 - Only the Planner can declare the overall project finished.
 

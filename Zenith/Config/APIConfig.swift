@@ -62,7 +62,25 @@ enum APIConfig {
     
     static let apiPath = "/api/v1"
     static let serviceKey = "2469ab5d2f05509a8c2e28b422cdc8b5ebebc037cb27cfc7071818fa172464b2"
-    private static var authToken: String?
+    private static let tokenService = "zenith.auth.token"
+    private static let tokenAccount = "userToken"
+    public static var authToken: String? {
+        get {
+            if let data = KeychainHelper.shared.read(service: tokenService, account: tokenAccount),
+               let token = String(data: data, encoding: .utf8) {
+                return token
+            }
+            return nil
+        }
+        set {
+            if let value = newValue {
+                let data = value.data(using: .utf8) ?? Data()
+                KeychainHelper.shared.save(data, service: tokenService, account: tokenAccount)
+            } else {
+                KeychainHelper.shared.delete(service: tokenService, account: tokenAccount)
+            }
+        }
+    }
     
     static var isDebugLoggingEnabled = false
     
@@ -117,7 +135,7 @@ enum APIConfig {
         request.setValue(serviceKey, forHTTPHeaderField: "X-Service-Key")
         
         // If we have a token, add it too
-        if let token = authToken {
+        if let token = authToken, !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         
@@ -224,4 +242,3 @@ private extension URLRequest {
         allHTTPHeaderFields ?? [:]
     }
 } 
-

@@ -8,7 +8,7 @@ class TaskViewModel: ObservableObject {
     @Published var tasks: [TodoTask] = []
     @Published private(set) var overdueTasks: [TodoTask] = []
     @Published private(set) var isLoading = false
-    @Published private(set) var greeting: String = ""
+    @Published private(set) var greeting: String = "Loading..."
     @Published private(set) var formattedDate: String = ""
     @Published var showingUndoToast = false
     @Published var lastCompletedTaskTitle: String = ""
@@ -32,6 +32,11 @@ class TaskViewModel: ObservableObject {
     private let lastSyncKey = "last_successful_sync"
     
     init() {
+        // Only proceed if authenticated
+        guard APIConfig.authToken != nil else {
+            print("[TaskViewModel] Not authenticated. Skipping task loading.")
+            return
+        }
         updateDateTime()
         
         // Load cached data from disk
@@ -769,6 +774,23 @@ class TaskViewModel: ObservableObject {
         // Tasks suitable for focus sessions (perhaps based on priority)
         return tasks.filter { task in
             task.priority == "HIGH"
+        }
+    }
+    
+    func refreshAfterLogin() {
+        // Called after login to update greeting, date, and load tasks
+        updateDateTime()
+        Task {
+            await self.loadAllTasksAfterLogin()
+        }
+    }
+    
+    @MainActor
+    private func loadAllTasksAfterLogin() async {
+        do {
+            try await self.loadAllTasks()
+        } catch {
+            print("[TaskViewModel] Error loading tasks after login: \(error)")
         }
     }
 } 

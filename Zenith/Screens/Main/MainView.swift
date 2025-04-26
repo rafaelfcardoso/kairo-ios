@@ -271,6 +271,9 @@ struct MainView: View {
                         .environmentObject(viewModel)
                 }
             }
+            .onAppear {
+                viewModel.refreshAfterLogin()
+            }
         }
     }
     
@@ -295,6 +298,7 @@ struct MainView: View {
             Text(viewModel.greeting)
                 .font(.headline)
                 .foregroundColor(textColor)
+                .accessibilityIdentifier("TodayGreeting")
             
             Text(viewModel.formattedDate)
                 .font(.subheadline)
