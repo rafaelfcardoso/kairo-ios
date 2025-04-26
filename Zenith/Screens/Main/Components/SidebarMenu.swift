@@ -8,6 +8,8 @@ struct SidebarMenu: View {
     @Binding var selectedProject: Project?
     @State private var showingCreateProject = false
     @State private var statusBarHeight: CGFloat = 0
+    @State private var showingSettingsSheet = false
+    @EnvironmentObject var authViewModel: AuthViewModel
     
     // Theme colors
     var backgroundColor: Color {
@@ -198,7 +200,7 @@ struct SidebarMenu: View {
                                     .foregroundColor(secondaryTextColor)
                             )
                         
-                        Text("Rafael Cardoso")
+                        Text(authViewModel.userName.isEmpty ? "Usuário" : authViewModel.userName)
                             .font(.headline)
                             .foregroundColor(textColor)
                         
@@ -206,7 +208,7 @@ struct SidebarMenu: View {
                         
                         // Settings button
                         Button {
-                            // Settings action will be implemented later
+                            showingSettingsSheet = true
                         } label: {
                             Image(systemName: "gearshape.fill")
                                 .font(.system(size: 20))
@@ -226,6 +228,12 @@ struct SidebarMenu: View {
             CreateProjectView(viewModel: projectViewModel)
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingSettingsSheet) {
+            SettingsSheet(authViewModel: authViewModel, isShowing: $showingSettingsSheet, onLogout: {
+                // This will be set by the parent (ZenithApp)
+                NotificationCenter.default.post(name: .userDidLogout, object: nil)
+            })
         }
         .onAppear {
             // Load projects when sidebar appears, but use caching
@@ -297,5 +305,11 @@ struct SidebarMenu: View {
         
         SidebarMenu(taskViewModel: TaskViewModel(), isShowingSidebar: .constant(true), selectedProject: .constant(nil))
             .environmentObject(ProjectViewModel())
+            .environmentObject(AuthViewModel())
     }
-} 
+}
+
+import Foundation
+extension Notification.Name {
+    static let userDidLogout = Notification.Name("userDidLogout")
+}
