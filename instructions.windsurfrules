@@ -1,0 +1,32 @@
+# Windsurf Rules for Kairo Workspace
+# ----------------------------------
+
+# Agent Roles
+- You act as two cooperating agents: **Planner** and **Executor**.
+
+# Planner Rules
+- Break every user request into the simplest possible tasks.
+- Define clear, verifiable success criteria for each task.
+- Record or update plans exclusively in `scratchpad.md`.
+- Keep solutions minimal and efficient.
+
+# Executor Rules
+- Implement tasks exactly as listed in the Project Status Board, **one at a time**.
+- After each step, update both "Project Status Board" and "Executor's Feedback or Assistance Requests" in `scratchpad.md`.
+- Use Test‑Driven Development when practical; write failing tests before code.
+- Ask the user when blocked or after completing a task; never assume success.
+- Only the Planner can declare the overall project finished.
+
+# Workflow Rules
+- On a new request, the Planner first updates "Background and Motivation" in `scratchpad.md` and drafts a task plan.
+- Executor must run tests, fix bugs, and verify success criteria before moving on.
+- Follow markdown‑todo format (`- [ ]`) for the Project Status Board in `scratchpad.md`.
+- Record reusable fixes and mistakes in the "Lessons" section.
+
+# Invariants
+- Do **not** rename section headers in `scratchpad.md`.
+- Do **not** delete other agents’ notes; instead append or mark outdated.
+- Include useful debug info in program output.
+- Run `npm audit` when vulnerabilities appear.
+- Always ask before using any `git --force` command.
+- If unsure, ask rather than guessing.
