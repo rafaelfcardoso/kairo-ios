@@ -25,7 +25,7 @@ The Today screen and sidebar projects are failing to load due to repeated 401 Un
 - [x] Token is now persisted securely via Keychain in `APIConfig`. Ready for integration with API headers and auth flow.
 - [x] TaskViewModel now requires authentication before loading tasks. Ready for root view switching logic.
 - [x] Root SwiftUI App view now presents LoginView if not authenticated, otherwise shows main content. Ready for E2E testing.
-- [ ] UI-tests are stubbed, identifiers added, and decoding fixed. Ready to rerun tests.
+- [x] UI-tests are stubbed, identifiers added, and decoding fixed. Ready to rerun tests.
 
 # Lessons
 
@@ -33,13 +33,13 @@ The Today screen and sidebar projects are failing to load due to repeated 401 Un
 
 # Next Steps
 
-- [ ] Add accessibility identifiers to `LoginView.swift` (EmailField, PasswordField, SignInButton).
-- [ ] Verify `LoginView` updates `APIConfig.authToken` and triggers MainView transition.
-- [ ] Ensure `TaskViewModel.refreshAfterLogin()` runs on appear.
-- [ ] Re-run UI tests and confirm `TodayGreeting` loads.
-- [ ] Investigate and fix any remaining UI-test failures.
-- [ ] Extract and store logged-in user's name from `AuthResponse` in `AuthViewModel`.
-- [ ] Update sidebar UI to display dynamic user name.
-- [ ] Present settings modal sheet when tapping the gear button.
-- [ ] Add a “Log Out” button in the settings modal.
-- [ ] Implement logout logic to clear `APIConfig.authToken` and reset app to Sign In screen.
+- [x] Add accessibility identifiers to `LoginView.swift` (EmailField, PasswordField, SignInButton).
+- [x] Verify `LoginView` updates `APIConfig.authToken` and triggers MainView transition.
+- [x] Ensure `TaskViewModel.refreshAfterLogin()` runs on appear.
+- [x] Re-run UI tests and confirm `TodayGreeting` loads.
+- [x] Investigate and fix any remaining UI-test failures.
+- [x] Extract and store logged-in user's name from `AuthResponse` in `AuthViewModel`.
+- [x] Update sidebar UI to display dynamic user name.
+- [x] Present settings modal sheet when tapping the gear button.
+- [x] Add a “Log Out” button in the settings modal.
+- [x] Implement logout logic to clear `APIConfig.authToken` and reset app to Sign In screen.
