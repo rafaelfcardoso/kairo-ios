@@ -6,6 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		537F1B172DC55A2D00EC1DEE /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = 537F1B162DC55A2D00EC1DEE /* MCP */; };
+		537F1B192DC5663500EC1DEE /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = 537F1B182DC5663500EC1DEE /* MCP */; };
+		537F1B1B2DC5664700EC1DEE /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = 537F1B1A2DC5664700EC1DEE /* MCP */; };
+		537F1B1D2DC6ADBE00EC1DEE /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 537F1B1C2DC6ADA700EC1DEE /* Secrets.xcconfig */; };
+		537F1B1F2DC6B66200EC1DEE /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 537F1B1E2DC6B65700EC1DEE /* .gitignore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		536362242D13028900672C90 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,13 +35,30 @@
 		536362122D13028700672C90 /* Zenith.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zenith.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		536362232D13028900672C90 /* ZenithTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZenithTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5363622D2D13028900672C90 /* ZenithUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZenithUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		537F1B1C2DC6ADA700EC1DEE /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		537F1B1E2DC6B65700EC1DEE /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		53EF95B42D4279F10096E74A /* Exceptions for "Zenith" folder in "Zenith" target */ = {
+		53129FB92DC17D2D004876B1 /* Exceptions for "Zenith" folder in "Zenith" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Agents/.keep,
+				App/.keep,
+				Core/.keep,
+				Data/Local/.keep,
+				Data/Mappers/.keep,
+				Data/MCP/.keep,
+				Data/Remote/.keep,
+				Data/Repositories/.keep,
+				Domain/Entities/.keep,
+				Domain/Services/.keep,
+				Domain/UseCases/.keep,
 				Info.plist,
+				Presentation/Features/.keep,
+				Presentation/SharedUI/.keep,
+				Tests/UI/.keep,
+				Tests/Unit/.keep,
 			);
 			target = 536362112D13028700672C90 /* Zenith */;
 		};
@@ -43,7 +68,7 @@
 		536362142D13028700672C90 /* Zenith */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				53EF95B42D4279F10096E74A /* Exceptions for "Zenith" folder in "Zenith" target */,
+				53129FB92DC17D2D004876B1 /* Exceptions for "Zenith" folder in "Zenith" target */,
 			);
 			path = Zenith;
 			sourceTree = "<group>";
@@ -65,6 +90,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				537F1B172DC55A2D00EC1DEE /* MCP in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,6 +98,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				537F1B192DC5663500EC1DEE /* MCP in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,18 +106,29 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				537F1B1B2DC5664700EC1DEE /* MCP in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		53129FBA2DC17FB0004876B1 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		536362092D13028700672C90 = {
 			isa = PBXGroup;
 			children = (
+				537F1B1E2DC6B65700EC1DEE /* .gitignore */,
+				537F1B1C2DC6ADA700EC1DEE /* Secrets.xcconfig */,
 				536362142D13028700672C90 /* Zenith */,
 				536362262D13028900672C90 /* ZenithTests */,
 				536362302D13028900672C90 /* ZenithUITests */,
+				53129FBA2DC17FB0004876B1 /* Frameworks */,
 				536362132D13028700672C90 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -125,6 +163,7 @@
 			);
 			name = Zenith;
 			packageProductDependencies = (
+				537F1B162DC55A2D00EC1DEE /* MCP */,
 			);
 			productName = ProjectZenith;
 			productReference = 536362122D13028700672C90 /* Zenith.app */;
@@ -148,6 +187,7 @@
 			);
 			name = ZenithTests;
 			packageProductDependencies = (
+				537F1B182DC5663500EC1DEE /* MCP */,
 			);
 			productName = ProjectZenithTests;
 			productReference = 536362232D13028900672C90 /* ZenithTests.xctest */;
@@ -171,6 +211,7 @@
 			);
 			name = ZenithUITests;
 			packageProductDependencies = (
+				537F1B1A2DC5664700EC1DEE /* MCP */,
 			);
 			productName = ProjectZenithUITests;
 			productReference = 5363622D2D13028900672C90 /* ZenithUITests.xctest */;
@@ -208,6 +249,9 @@
 			);
 			mainGroup = 536362092D13028700672C90;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				537F1B152DC55A2D00EC1DEE /* XCRemoteSwiftPackageReference "swift-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 536362132D13028700672C90 /* Products */;
 			projectDirPath = "";
@@ -225,6 +269,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				537F1B1F2DC6B66200EC1DEE /* .gitignore in Resources */,
+				537F1B1D2DC6ADBE00EC1DEE /* Secrets.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -284,6 +330,7 @@
 /* Begin XCBuildConfiguration section */
 		536362352D13028900672C90 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 537F1B1C2DC6ADA700EC1DEE /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -347,6 +394,7 @@
 		};
 		536362362D13028900672C90 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 537F1B1C2DC6ADA700EC1DEE /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -618,6 +666,35 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		537F1B152DC55A2D00EC1DEE /* XCRemoteSwiftPackageReference "swift-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/modelcontextprotocol/swift-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.7.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		537F1B162DC55A2D00EC1DEE /* MCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 537F1B152DC55A2D00EC1DEE /* XCRemoteSwiftPackageReference "swift-sdk" */;
+			productName = MCP;
+		};
+		537F1B182DC5663500EC1DEE /* MCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 537F1B152DC55A2D00EC1DEE /* XCRemoteSwiftPackageReference "swift-sdk" */;
+			productName = MCP;
+		};
+		537F1B1A2DC5664700EC1DEE /* MCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 537F1B152DC55A2D00EC1DEE /* XCRemoteSwiftPackageReference "swift-sdk" */;
+			productName = MCP;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5363620A2D13028700672C90 /* Project object */;
 }

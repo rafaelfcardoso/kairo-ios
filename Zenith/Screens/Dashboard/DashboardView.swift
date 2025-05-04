@@ -225,13 +225,12 @@ extension View {
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
         TabView {
-            DashboardView()
-                .tabItem {
-                    Image(systemName: "rectangle.stack.fill")
-                    Text("Dashboard")
-                }
-            
-            MainView(showingSidebar: .constant(false))
+            // DashboardView() // Temporarily disabling dashboard tab to avoid chat duplication issues
+            //     .tabItem {
+            //         Image(systemName: "rectangle.stack.fill")
+            //         Text("Dashboard")
+            //     }
+            MainView(showingSidebar: .constant(false), selectedProject: .constant(nil))
                 .tabItem {
                     Image(systemName: "filemenu.and.selection")
                     Text("Hoje")

@@ -38,8 +38,8 @@ struct ProjectTasksView: View {
                 ErrorView(
                     secondaryTextColor: secondaryTextColor,
                     textColor: textColor,
-                    retryAction: loadProjectTasks,
-                    errorMessage: errorMessage
+                    errorMessage: errorMessage ?? "Erro desconhecido. Tente novamente mais tarde.",
+                    onRetry: loadProjectTasks
                 )
             } else if taskViewModel.isOfflineMode {
                 VStack(spacing: 0) {

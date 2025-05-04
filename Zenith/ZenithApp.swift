@@ -253,11 +253,13 @@ struct ZenithApp: App {
 #endif
         // Initialize AFTER clearing token
         _isAuthenticated = State(initialValue: APIConfig.authToken != nil)
+        _chatViewModel = StateObject(wrappedValue: GlobalChatViewModel(taskViewModel: TaskViewModel()))
     }
     @StateObject private var taskViewModel = TaskViewModel()
     @StateObject private var focusViewModel = FocusSessionViewModel()
     @StateObject private var projectViewModel = ProjectViewModel()
     @StateObject private var keyboardHandler = KeyboardHeightHandler() // Track keyboard
+    @StateObject private var chatViewModel: GlobalChatViewModel
     @State private var selectedTab: Tab = .today
     @Environment(\.colorScheme) var colorScheme
     @State private var showingSidebar = false
@@ -278,7 +280,7 @@ struct ZenithApp: App {
                                 }
                                 .ignoresSafeArea()
                             
-                            // Main content area
+                            // Main content area with blur/disable when chat is open
                             Group {
                                 switch selectedTab {
                                 case .today:
@@ -308,25 +310,9 @@ struct ZenithApp: App {
                                     }
                                 }
                             }
-                            .safeAreaInset(edge: .bottom) {
-                                Color.clear.frame(height: 51) // Reserve space for tab bar
-                            }
+                            .blur(radius: chatViewModel.isExpanded ? 8 : 0)
+                            .disabled(chatViewModel.isExpanded)
                             .zIndex(0) // Base layer
-                            
-                            // Bottom bar layers in z-order
-                            
-                            // Tab bar - always stays at bottom
-                            VStack(spacing: 0) {
-                                Spacer()
-                                CustomTabBar(selectedTab: $selectedTab, focusViewModel: focusViewModel)
-                                    .frame(height: 51)
-                                    .background(
-                                        Rectangle()
-                                            .fill(colorScheme == .dark ? Color.black : Color(.systemGray6))
-                                    )
-                            }
-                            .zIndex(10) // Always on top of content
-                            .ignoresSafeArea(.keyboard, edges: .bottom) // Stay fixed at bottom
                             
                             // Chat input - positioned directly above tab bar
                             if !focusViewModel.isActive && !focusViewModel.isExpanded {
@@ -335,8 +321,8 @@ struct ZenithApp: App {
                                         .fill(Color.clear)
                                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                                     
-                                    GlobalChatInput(taskViewModel: taskViewModel)
-                                        .padding(.bottom, keyboardHandler.keyboardHeight > 0 ? 0 : 51)
+                                    GlobalChatInput(viewModel: chatViewModel)
+                                        .padding(.bottom, keyboardHandler.keyboardHeight > 0 ? 0 : 0)
                                         .offset(y: keyboardHandler.keyboardHeight > 0 ? geometry.size.height - keyboardHandler.keyboardHeight - 124 : 0)
                                         .animation(
                                             .interpolatingSpring(
@@ -367,7 +353,7 @@ struct ZenithApp: App {
                                         Rectangle()
                                             .fill(colorScheme == .dark ? Color.black : Color(.systemGray6))
                                     )
-                                    .padding(.bottom, 51) // Space for tab bar
+                                    .padding(.bottom, 0) // Space for tab bar
                                 }
                                 .zIndex(30) // Above chat input
                             }

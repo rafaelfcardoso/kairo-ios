@@ -8,6 +8,7 @@ struct InboxView: View {
     @State private var hasError = false
     @State private var inboxTasks: [TodoTask] = []
     @State private var showingCreateTask = false
+    @State private var errorMessage: String?
     
     var backgroundColor: Color {
         colorScheme == .dark ? .black : Color(hex: "F1F2F4")
@@ -36,7 +37,8 @@ struct InboxView: View {
                 ErrorView(
                     secondaryTextColor: secondaryTextColor,
                     textColor: textColor,
-                    retryAction: loadInboxTasks
+                    errorMessage: errorMessage ?? "Erro desconhecido. Tente novamente mais tarde.",
+                    onRetry: loadInboxTasks
                 )
             } else if inboxTasks.isEmpty {
                 VStack(spacing: 16) {
@@ -116,6 +118,7 @@ struct InboxView: View {
     private func loadInboxTasks() {
         isLoading = true
         hasError = false
+        errorMessage = nil
         
         Task {
             do {
@@ -134,6 +137,7 @@ struct InboxView: View {
             } catch {
                 isLoading = false
                 hasError = true
+                errorMessage = error.localizedDescription
                 print("Error loading inbox tasks: \(error)")
             }
         }

@@ -13,57 +13,34 @@ import Foundation
 struct ErrorView: View {
     let secondaryTextColor: Color
     let textColor: Color
-    let retryAction: () -> Void
-    var errorMessage: String? = nil
-    var isOfflineMode: Bool = false
+    let errorMessage: String
+    let onRetry: () -> Void
     
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: isOfflineMode ? "wifi.slash" : "exclamationmark.triangle")
+            Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 40))
                 .foregroundColor(secondaryTextColor)
             
-            Text(isOfflineMode ? "Modo Offline" : "Não foi possível carregar as tarefas")
+            Text("Não foi possível carregar as tarefas")
                 .font(.headline)
                 .foregroundColor(textColor)
             
-            if let errorMessage = errorMessage {
-                Text(errorMessage)
-                    .font(.subheadline)
-                    .foregroundColor(secondaryTextColor)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            } else {
-                Text(isOfflineMode ? 
-                     "Você está trabalhando offline. Algumas funcionalidades podem estar limitadas." : 
-                     "Verifique sua conexão e tente novamente")
-                    .font(.subheadline)
-                    .foregroundColor(secondaryTextColor)
-                    .multilineTextAlignment(.center)
-            }
+            Text(errorMessage)
+                .font(.subheadline)
+                .foregroundColor(secondaryTextColor)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
             
-            Button(action: retryAction) {
+            Button(action: onRetry) {
                 Text("Tentar novamente")
                     .foregroundColor(.blue)
             }
             .padding(.top, 8)
-            
-            if isOfflineMode {
-                Text("Última atualização: \(formattedLastUpdate)")
-                    .font(.caption)
-                    .foregroundColor(secondaryTextColor)
-            }
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
-    }
-    
-    private var formattedLastUpdate: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
-        return formatter.string(from: Date())
     }
 }
 
@@ -80,17 +57,9 @@ struct MainView: View {
     @Environment(\.colorScheme) var colorScheme
     @EnvironmentObject var focusSessionViewModel: FocusSessionViewModel
     @State private var selectedFilterName: String = "Hoje"
-    
-    // Use app-level binding for selected project
     @Binding var selectedProject: Project?
     
-    init(showingSidebar: Binding<Bool>) {
-        self._showingSidebar = showingSidebar
-        // Create a default empty binding for selectedProject
-        self._selectedProject = .constant(nil)
-    }
-    
-    // Constructor that accepts both bindings
+    // Use app-level binding for selected project
     init(showingSidebar: Binding<Bool>, selectedProject: Binding<Project?>) {
         self._showingSidebar = showingSidebar
         self._selectedProject = selectedProject
@@ -152,65 +121,20 @@ struct MainView: View {
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            ZStack(alignment: .bottom) {
-                backgroundColor
-                    .ignoresSafeArea()
-                
-                VStack {
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .padding(.top, 100)
-                    } else if hasError && !viewModel.isOfflineMode {
-                        ErrorView(
-                            secondaryTextColor: secondaryTextColor,
-                            textColor: textColor,
-                            retryAction: {
-                                Task {
-                                    await performTaskLoad()
-                                }
-                            },
-                            errorMessage: errorMessage
-                        )
-                    } else if viewModel.isOfflineMode {
-                        VStack {
-                            // Offline banner
-                            HStack {
-                                Image(systemName: "wifi.slash")
-                                    .foregroundColor(secondaryTextColor)
-                                Text("Modo Offline")
-                                    .font(.subheadline)
-                                    .foregroundColor(secondaryTextColor)
-                                Spacer()
-                                Button("Reconectar") {
-                                    Task {
-                                        await performTaskLoad()
-                                    }
-                                }
-                                .font(.subheadline)
-                                .foregroundColor(.blue)
-                            }
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                            .padding(.top)
-                            
-                            // Show cached content
-                            TaskContentView(
-                                selectedProject: $selectedProject,
-                                selectedTab: $selectedTab,
-                                viewModel: viewModel,
-                                showingCreateTask: $showingCreateTask,
-                                secondaryTextColor: secondaryTextColor,
-                                cardBackgroundColor: cardBackgroundColor,
-                                displayedTasks: displayedTasks,
-                                onLoadTasks: { @Sendable in
-                                    await self.performTaskLoad()
-                                }
-                            )
-                        }
-                    } else {
+            // Main content only; chat overlay is now global at app level
+            VStack {
+                if viewModel.isLoading {
+                    ProgressView()
+                        .padding(.top, 100)
+                } else if hasError && !viewModel.isOfflineMode {
+                    ErrorView(
+                        secondaryTextColor: secondaryTextColor,
+                        textColor: textColor,
+                        errorMessage: errorMessage ?? "Erro desconhecido. Tente novamente mais tarde.",
+                        onRetry: { Task { await performTaskLoad() } }
+                    )
+                } else {
+                    if !displayedTasks.isEmpty {
                         TaskContentView(
                             selectedProject: $selectedProject,
                             selectedTab: $selectedTab,
@@ -219,43 +143,36 @@ struct MainView: View {
                             secondaryTextColor: secondaryTextColor,
                             cardBackgroundColor: cardBackgroundColor,
                             displayedTasks: displayedTasks,
-                            onLoadTasks: { @Sendable in
-                                await self.performTaskLoad()
-                            }
+                            onLoadTasks: { @Sendable in await self.performTaskLoad() }
+                        )
+                    } else {
+                        // Optionally, show an empty state view here
+                        TaskContentView(
+                            selectedProject: $selectedProject,
+                            selectedTab: $selectedTab,
+                            viewModel: viewModel,
+                            showingCreateTask: $showingCreateTask,
+                            secondaryTextColor: secondaryTextColor,
+                            cardBackgroundColor: cardBackgroundColor,
+                            displayedTasks: displayedTasks,
+                            onLoadTasks: { @Sendable in await self.performTaskLoad() }
                         )
                     }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    sidebarButton
-                }
-                
-                ToolbarItem(placement: .principal) {
-                    titleView
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    addButton
-                }
+                ToolbarItem(placement: .navigationBarLeading) { sidebarButton }
+                ToolbarItem(placement: .principal) { titleView }
+                ToolbarItem(placement: .navigationBarTrailing) { addButton }
             }
-            .task {
-                await performTaskLoad()
-            }
+            .task { await performTaskLoad() }
             .sheet(isPresented: $showingCreateTask) {
                 CreateTaskFormView(
                     viewModel: viewModel,
-                    onTaskSaved: { @Sendable in
-                        Task {
-                            await self.performTaskLoad()
-                        }
-                    }
+                    onTaskSaved: { @Sendable in Task { await self.performTaskLoad() } }
                 )
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
-                .interactiveDismissDisabled(false)
             }
             .onChange(of: selectedProject) { _, _ in
                 Task {
@@ -378,9 +295,9 @@ struct MainView: View {
 
 struct MainView_Previews: PreviewProvider {
     static var previews: some View {
-        MainView(showingSidebar: .constant(false))
+        MainView(showingSidebar: .constant(false), selectedProject: .constant(nil))
             .environmentObject(TaskViewModel())
             .environmentObject(FocusSessionViewModel())
             .environmentObject(ProjectViewModel())
     }
-} 
+}
