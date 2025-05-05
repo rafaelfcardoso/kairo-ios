@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 import AVFoundation
 
 // MARK: - Theme
@@ -45,7 +46,11 @@ import AVFoundation
 
 // MARK: - Keyboard Height Handler
 class KeyboardHeightHandler: ObservableObject {
-    @Published var keyboardHeight: CGFloat = 0
+    @Published var keyboardHeight: CGFloat = 0 {
+        didSet {
+            print("[KeyboardHeightHandler] keyboardHeight updated: \(keyboardHeight)")
+        }
+    }
     @Published var animationDuration: Double = 0.25
     
     init() {
@@ -253,7 +258,7 @@ struct ZenithApp: App {
 #endif
         // Initialize AFTER clearing token
         _isAuthenticated = State(initialValue: APIConfig.authToken != nil)
-        _chatViewModel = StateObject(wrappedValue: GlobalChatViewModel(taskViewModel: TaskViewModel()))
+        _chatViewModel = StateObject(wrappedValue: GlobalChatViewModel())
     }
     @StateObject private var taskViewModel = TaskViewModel()
     @StateObject private var focusViewModel = FocusSessionViewModel()
@@ -268,229 +273,38 @@ struct ZenithApp: App {
     
     var body: some Scene {
         WindowGroup {
-            Group {
-                if isAuthenticated {
-                    GeometryReader { geometry in
-                        ZStack {
-                            // Background tap recognizer to dismiss keyboard
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    hideKeyboard()
-                                }
-                                .ignoresSafeArea()
-                            
-                            // Main content area with blur/disable when chat is open
-                            Group {
-                                switch selectedTab {
-                                case .today:
-                                    MainView(
-                                        showingSidebar: $showingSidebar,
-                                        selectedProject: $selectedProject
-                                    )
-                                    .environmentObject(taskViewModel)
-                                    .environmentObject(focusViewModel)
-                                    .environmentObject(projectViewModel)
-                                    .environmentObject(keyboardHandler)
-                                    .onAppear {
-                                        // Ensure greeting/tasks are loaded after login
-                                        taskViewModel.refreshAfterLogin()
-                                        print("[ZenithApp] MainView appeared and called refreshAfterLogin() on TaskViewModel (post-login)")
-                                    }
-                                case .blocks:
-                                    NavigationStack {
-                                        BlocksView(showingSidebar: $showingSidebar)
-                                            .environmentObject(projectViewModel)
-                                            .environmentObject(focusViewModel)
-                                    }
-                                    .transition(.opacity)
-                                    .onAppear {
-                                        // Clear selected project when switching to Blocks tab
-                                        selectedProject = nil
-                                    }
-                                }
-                            }
-                            .blur(radius: chatViewModel.isExpanded ? 8 : 0)
-                            .disabled(chatViewModel.isExpanded)
-                            .zIndex(0) // Base layer
-                            
-                            // Chat input - positioned directly above tab bar
-                            if !focusViewModel.isActive && !focusViewModel.isExpanded {
-                                ZStack(alignment: .bottom) {
-                                    Rectangle()
-                                        .fill(Color.clear)
-                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    
-                                    GlobalChatInput(viewModel: chatViewModel)
-                                        .padding(.bottom, keyboardHandler.keyboardHeight > 0 ? 0 : 0)
-                                        .offset(y: keyboardHandler.keyboardHeight > 0 ? geometry.size.height - keyboardHandler.keyboardHeight - 124 : 0)
-                                        .animation(
-                                            .interpolatingSpring(
-                                                mass: 0.6,  // Reduced mass for faster response
-                                                stiffness: 140,  // Increased stiffness
-                                                damping: 12.0,  // Slightly reduced damping
-                                                initialVelocity: 0
-                                            ),
-                                            value: keyboardHandler.keyboardHeight
-                                        )
-                                }
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                                .zIndex(20) // Above tab bar
-                            }
-                            
-                            // Minimized Focus Session 
-                            if focusViewModel.isActive && focusViewModel.isMinimized {
-                                VStack {
-                                    Spacer()
-                                    MinimizedFocusSession(
-                                        taskTitle: focusViewModel.selectedTask?.title,
-                                        progress: focusViewModel.progress,
-                                        remainingTime: focusViewModel.remainingTime,
-                                        blockDistractions: focusViewModel.blockDistractions,
-                                        onExpand: focusViewModel.expandSession
-                                    )
-                                    .background(
-                                        Rectangle()
-                                            .fill(colorScheme == .dark ? Color.black : Color(.systemGray6))
-                                    )
-                                    .padding(.bottom, 0) // Space for tab bar
-                                }
-                                .zIndex(30) // Above chat input
-                            }
-                            
-                            // Undo toast
-                            if taskViewModel.showingUndoToast {
-                                VStack {
-                                    Spacer()
-                                    UndoToastView(
-                                        message: "\"\(taskViewModel.lastCompletedTaskTitle)\" concluída",
-                                        action: {
-                                            do {
-                                                try await taskViewModel.undoLastCompletion()
-                                                withAnimation {
-                                                    taskViewModel.showingUndoToast = false
-                                                }
-                                            } catch {
-                                                print("Error undoing task completion: \(error)")
-                                            }
-                                        },
-                                        isPresented: $taskViewModel.showingUndoToast
-                                    )
-                                    .padding(.bottom, 71) // Position above tab bar
-                                }
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                                .zIndex(40) // Above minimized focus
-                            }
-                            
-                            // Full-screen focus session overlay
-                            if focusViewModel.isExpanded {
-                                FocusSessionView()
-                                    .environmentObject(taskViewModel)
-                                    .environmentObject(focusViewModel)
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .bottom).combined(with: .opacity),
-                                        removal: .move(edge: .bottom).combined(with: .opacity)
-                                    ))
-                                    .zIndex(50) // Above toast
-                            }
-                            
-                            // Sidebar overlay
-                            if showingSidebar {
-                                // Background dim overlay (without move transition)
-                                Color.black.opacity(0.4)
-                                    .ignoresSafeArea()
-                                    .onTapGesture {
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                            showingSidebar = false
-                                            HapticManager.shared.impact(style: .light)
-                                        }
-                                    }
-                                    .transition(.opacity)
-                                    .zIndex(60)
-                                
-                                // Sidebar content (with move transition)
-                                ZStack(alignment: .leading) {
-                                    SidebarMenu(
-                                        taskViewModel: taskViewModel,
-                                        isShowingSidebar: $showingSidebar,
-                                        selectedProject: $selectedProject
-                                    )
-                                    .environmentObject(projectViewModel)
-                                    .environmentObject(authViewModel)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .transition(.move(edge: .leading))
-                                .zIndex(61) // Slightly higher than the background
-                            }
+            if isAuthenticated {
+                AppMainView(
+                    taskViewModel: taskViewModel,
+                    focusViewModel: focusViewModel,
+                    projectViewModel: projectViewModel,
+                    keyboardHandler: keyboardHandler,
+                    chatViewModel: chatViewModel,
+                    showingSidebar: $showingSidebar,
+                    selectedProject: $selectedProject,
+                    selectedTab: $selectedTab,
+                    isAuthenticated: $isAuthenticated
+                )
+                .environmentObject(authViewModel)
+            } else {
+                LoginView()
+                    .environmentObject(authViewModel)
+                    .onChange(of: APIConfig.authToken) { _, newValue in
+                        if newValue != nil {
+                            isAuthenticated = true
                         }
-                        // Add tap gesture to dismiss keyboard at ZStack level for better coverage
-                        .simultaneousGesture(
-                            TapGesture()
-                                .onEnded { _ in
-                                    // Only dismiss keyboard if it's shown (performance optimization)
-                                    if keyboardHandler.keyboardHeight > 0 {
-                                        hideKeyboard()
-                                    }
-                                }
-                        )
-                        .onChange(of: colorScheme) { _, newValue in
-                            // Update AppTheme at the app level as well
-                            AppTheme.shared.updateColorScheme(newValue)
-                        }
-                        .onChange(of: showingSidebar) { _, newValue in
-                            // Add haptic feedback when sidebar state changes
-                            if newValue {
-                                // Sidebar is being opened
-                                HapticManager.shared.impact(style: .medium)
-                            }
-                        }
-                        .onChange(of: selectedTab) { _, newValue in
-                            // Clear selected project when switching to Blocks tab
-                            if newValue == .blocks {
-                                selectedProject = nil
-                            }
-                        }
-                        .animation(.spring(response: 0.4, dampingFraction: 0.9), value: focusViewModel.isExpanded)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingSidebar)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: taskViewModel.showingUndoToast)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: focusViewModel.isActive)
-                    }
-                    .task {
-                        // Preload data when app starts to ensure it's available when needed
-                        await preloadData()
                     }
                     .onChange(of: authViewModel.userName) { _, _ in
-                        // No-op, but ensures view updates when userName changes
+                        // No-op, ensures view updates
                     }
-                } else {
-                    LoginView()
-                        .environmentObject(authViewModel)
-                        .onChange(of: APIConfig.authToken) { _, newValue in
-                            if newValue != nil {
-                                isAuthenticated = true
-                            }
-                        }
-                        .onChange(of: authViewModel.userName) { _, _ in
-                            // No-op, ensures view updates
-                        }
-                }
-            }
-            .onAppear {
-                NotificationCenter.default.addObserver(forName: .userDidLogout, object: nil, queue: .main) { _ in
-                    isAuthenticated = false
-                }
             }
         }
-        .onChange(of: authViewModel.userName) { _, newValue in
-            if newValue.isEmpty && APIConfig.authToken == nil {
-                isAuthenticated = false
-            }
-        }
+
     }
     
     // Method to dismiss keyboard
     private func hideKeyboard() {
-        UIApplication.shared.endEditing()
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
     
     // Preload data when app starts to ensure it's available when needed

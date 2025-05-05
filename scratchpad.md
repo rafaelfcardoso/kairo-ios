@@ -140,8 +140,41 @@ This refactor will:
 - Chat overlay can be exited/closed, returning to main content.
 - (Optional) Chat sessions persist across app restarts.
 
+### Debugging: SwiftUI Type-Check Error
+- Issue: Compiler unable to type-check a complex SwiftUI expression in `ZenithApp.swift` at line 269.
+- Plan:
+  1. Open `ZenithApp.swift` at the WindowGroup body starting at line 269.
+  2. Identify deeply nested closures: `GeometryReader` → `ZStack` → `Group` → `switch` → etc.
+  3. Extract the entire inner view (from `GeometryReader { ... }`) into a new subview, e.g. `AppMainView: View`.
+     - Move all logic inside `GeometryReader` into `AppMainView`, passing necessary state bindings and view models.
+  4. Similarly extract the custom tab bar content into its own `CustomTabBarView`.
+  5. In `ZenithApp.swift`, replace the long body with:
+     ```swift
+     WindowGroup {
+         AppMainView(
+             taskViewModel: taskViewModel,
+             focusViewModel: focusViewModel,
+             projectViewModel: projectViewModel,
+             keyboardHandler: keyboardHandler,
+             chatViewModel: chatViewModel,
+             showingSidebar: $showingSidebar,
+             selectedProject: $selectedProject,
+             selectedTab: $selectedTab
+         )
+     }
+     ```
+  6. Break up long modifier chains by assigning intermediate views to variables or using computed properties:
+     ```swift
+     let mainView = MainView(...)
+         .environmentObject(...) // etc.
+     mainView
+         .blur(...) // apply modifiers
+     ```
+  7. Re-run the build. The compiler should now be able to type-check quickly.
+
 # Executor's Feedback or Assistance Requests
 - Build validated, proceeding with MCP chat-driven task creation integration as planned.
+- Starting refactor: Chat UI will become a first-class screen (not overlay), so navigation/sidebar is always accessible. Chat sessions will be managed as screens, not modals.
 
 # Lessons
 - Naming collisions with Swift's Task type require using TodoTask consistently across all layers.

@@ -10,6 +10,8 @@ struct SidebarMenu: View {
     @State private var statusBarHeight: CGFloat = 0
     @State private var showingSettingsSheet = false
     @EnvironmentObject var authViewModel: AuthViewModel
+    @ObservedObject var chatSessionsViewModel: ChatSessionsViewModel
+    var onSelectChatSession: ((ChatSession) -> Void)?
     
     // Theme colors
     var backgroundColor: Color {
@@ -101,6 +103,41 @@ struct SidebarMenu: View {
                                 withAnimation {
                                     isShowingSidebar = false
                                 }
+                            }
+                        }
+                        
+                        // Chat Section
+                        HStack {
+                            Text("CHAT")
+                                .font(.footnote)
+                                .fontWeight(.semibold)
+                                .foregroundColor(secondaryTextColor)
+                            Spacer()
+                            Button(action: {
+                                // Start new chat session
+                                chatSessionsViewModel.startNewSession()
+                                if let session = chatSessionsViewModel.currentSession {
+                                    onSelectChatSession?(session)
+                                }
+                                withAnimation { isShowingSidebar = false }
+                            }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 16)
+                        
+                        ForEach(chatSessionsViewModel.sessions) { session in
+                            menuItem(
+                                icon: "bubble.left.and.bubble.right.fill",
+                                title: session.title.isEmpty ? "Chat em branco" : session.title,
+                                count: session.messages.count,
+                                isSelected: chatSessionsViewModel.currentSession?.id == session.id
+                            ) {
+                                chatSessionsViewModel.selectSession(session)
+                                onSelectChatSession?(session)
+                                withAnimation { isShowingSidebar = false }
                             }
                         }
                         
@@ -303,7 +340,7 @@ struct SidebarMenu: View {
     ZStack {
         Color.gray.opacity(0.3).edgesIgnoringSafeArea(.all)
         
-        SidebarMenu(taskViewModel: TaskViewModel(), isShowingSidebar: .constant(true), selectedProject: .constant(nil))
+        SidebarMenu(taskViewModel: TaskViewModel(), isShowingSidebar: .constant(true), selectedProject: .constant(nil), chatSessionsViewModel: ChatSessionsViewModel())
             .environmentObject(ProjectViewModel())
             .environmentObject(AuthViewModel())
     }
