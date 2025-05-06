@@ -9,6 +9,7 @@ struct SidebarMenu: View {
     @State private var showingCreateProject = false
     @State private var statusBarHeight: CGFloat = 0
     @State private var showingSettingsSheet = false
+    @State private var showingCreateChat = false
     @EnvironmentObject var authViewModel: AuthViewModel
     @ObservedObject var chatSessionsViewModel: ChatSessionsViewModel
     var onSelectChatSession: ((ChatSession) -> Void)?
@@ -53,19 +54,29 @@ struct SidebarMenu: View {
                 Color.clear
                     .frame(height: statusBarHeight)
                 
-                // Search bar
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(secondaryTextColor)
-                    
-                    Text("Pesquisar")
-                        .foregroundColor(secondaryTextColor)
-                    
-                    Spacer()
+                // Search bar row with new chat button outside
+                HStack(alignment: .center, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(secondaryTextColor)
+                        Text("Pesquisar")
+                            .foregroundColor(secondaryTextColor)
+                        Spacer()
+                    }
+                    .padding(10)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(10)
+                    // No .padding(.horizontal) here, keep tight for row
+                    Button(action: {
+                        // Add chat creation logic here
+                        withAnimation { showingCreateChat = true }
+                    }) {
+                        Image(systemName: "square.and.pencil")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 20, weight: .medium))
+                            .accessibilityLabel("Novo chat")
+                    }
                 }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(10)
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 
@@ -113,17 +124,6 @@ struct SidebarMenu: View {
                                 .fontWeight(.semibold)
                                 .foregroundColor(secondaryTextColor)
                             Spacer()
-                            Button(action: {
-                                // Start new chat session
-                                chatSessionsViewModel.startNewSession()
-                                if let session = chatSessionsViewModel.currentSession {
-                                    onSelectChatSession?(session)
-                                }
-                                withAnimation { isShowingSidebar = false }
-                            }) {
-                                Image(systemName: "plus.circle.fill")
-                                    .foregroundColor(.blue)
-                            }
                         }
                         .padding(.horizontal)
                         .padding(.top, 16)
@@ -271,6 +271,9 @@ struct SidebarMenu: View {
                 // This will be set by the parent (ZenithApp)
                 NotificationCenter.default.post(name: .userDidLogout, object: nil)
             })
+        }
+        .sheet(isPresented: $showingCreateChat) {
+            // Add chat creation view here
         }
         .onAppear {
             // Load projects when sidebar appears, but use caching

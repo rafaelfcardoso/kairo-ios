@@ -24,40 +24,9 @@ struct AppMainView: View {
                     .onTapGesture { hideKeyboard() }
                     .ignoresSafeArea()
 
+                // --- SIDEBAR + MAIN CONTENT LAYOUT (robust, fixed sidebar) ---
                 ZStack(alignment: .leading) {
-                    // Main content and dimming overlay
-                    Group {
-                        switch selectedTab {
-                        case .today:
-                            MainView(
-                                showingSidebar: $showingSidebar,
-                                selectedProject: $selectedProject
-                            )
-                            .environmentObject(taskViewModel)
-                            .environmentObject(focusViewModel)
-                            .environmentObject(projectViewModel)
-                            .environmentObject(keyboardHandler)
-                            .onAppear { taskViewModel.refreshAfterLogin() }
-                        case .blocks:
-                            NavigationStack {
-                                // ... (existing blocks view code) ...
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .disabled(showingSidebar)
-
-                    // Dimming overlay covers only main content
-                    if showingSidebar {
-                        Color.black.opacity(0.3)
-                            .ignoresSafeArea()
-                            .onTapGesture {
-                                withAnimation { showingSidebar = false }
-                            }
-                            .zIndex(1)
-                    }
-
-                    // Sidebar slides over content
+                    // Sidebar: absolutely positioned, always at the left edge when open
                     if showingSidebar {
                         SidebarMenu(
                             taskViewModel: taskViewModel,
@@ -70,20 +39,63 @@ struct AppMainView: View {
                             }
                         )
                         .environmentObject(projectViewModel)
-                        .frame(width: 270)
+                        .frame(width: min(geometry.size.width * 0.8, 320))
+                        .ignoresSafeArea(.container, edges: .vertical)
                         .transition(.move(edge: .leading))
                         .zIndex(2)
                     }
 
-                    // Chat screen as first-class screen (not overlay)
-                    if let session = activeChatSession {
-                        NavigationStack {
-                            ChatScreen(sessionsViewModel: chatSessionsViewModel)
+                    // Main content (offset right when sidebar is open)
+                    ZStack {
+                        Group {
+                            switch selectedTab {
+                            case .today:
+                                MainView(
+                                    showingSidebar: $showingSidebar,
+                                    selectedProject: $selectedProject
+                                )
+                                .environmentObject(taskViewModel)
+                                .environmentObject(focusViewModel)
+                                .environmentObject(projectViewModel)
+                                .environmentObject(keyboardHandler)
+                                .onAppear { taskViewModel.refreshAfterLogin() }
+                            case .blocks:
+                                NavigationStack {
+                                    // ... (existing blocks view code) ...
+                                }
+                            }
                         }
-                        .zIndex(3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .disabled(showingSidebar)
+                    }
+                    .offset(x: showingSidebar ? min(geometry.size.width * 0.8, 320) : 0)
+                    .animation(.easeInOut, value: showingSidebar)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .zIndex(1)
+
+                    // Overlay: absolutely positioned, covers only the main content area
+                    if showingSidebar {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                withAnimation { showingSidebar = false }
+                            }
+                            .frame(width: geometry.size.width - min(geometry.size.width * 0.8, 320))
+                            .offset(x: min(geometry.size.width * 0.8, 320))
+                            .zIndex(3)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .animation(.easeInOut, value: showingSidebar)
+
+                // Chat screen as first-class screen (not overlay)
+                if let session = activeChatSession {
+                    NavigationStack {
+                        ChatScreen(sessionsViewModel: chatSessionsViewModel)
+                    }
+                    .zIndex(3)
+                }
 
                 // Global Chat Input (always at the bottom)
                 if activeChatSession == nil && !focusViewModel.isExpanded && !showingSidebar {
