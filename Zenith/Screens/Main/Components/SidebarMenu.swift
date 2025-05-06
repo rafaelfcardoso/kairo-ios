@@ -9,7 +9,6 @@ struct SidebarMenu: View {
     @State private var showingCreateProject = false
     @State private var statusBarHeight: CGFloat = 0
     @State private var showingSettingsSheet = false
-    @State private var showingCreateChat = false
     @EnvironmentObject var authViewModel: AuthViewModel
     @ObservedObject var chatSessionsViewModel: ChatSessionsViewModel
     var onSelectChatSession: ((ChatSession) -> Void)?
@@ -68,8 +67,12 @@ struct SidebarMenu: View {
                     .cornerRadius(10)
                     // No .padding(.horizontal) here, keep tight for row
                     Button(action: {
-                        // Add chat creation logic here
-                        withAnimation { showingCreateChat = true }
+                        // Start new chat session and open overlay
+                        chatSessionsViewModel.startNewSession()
+                        if let session = chatSessionsViewModel.currentSession {
+                            onSelectChatSession?(session)
+                        }
+                        withAnimation { isShowingSidebar = false }
                     }) {
                         Image(systemName: "square.and.pencil")
                             .foregroundColor(.blue)
@@ -273,9 +276,6 @@ struct SidebarMenu: View {
                 // This will be set by the parent (ZenithApp)
                 NotificationCenter.default.post(name: .userDidLogout, object: nil)
             })
-        }
-        .sheet(isPresented: $showingCreateChat) {
-            // Add chat creation view here
         }
         .onAppear {
             // Load projects when sidebar appears, but use caching

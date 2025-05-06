@@ -225,3 +225,53 @@ The user wants to enhance the chat overlay and focus session experience. The Tas
 
 ## Background and Motivation
 The goal is to robustly handle API authentication errors, ensure the user is prompted for re-authentication when needed, and make all error sources transparent through detailed logging. This supports a seamless user experience and efficient debugging.
+
+---
+
+## Planner Note: Unified Toolbar & Chat Input (All Major Screens)
+
+### Background & Motivation
+- User wants a consistent, professional navigation and chat experience across all major screens (Main, Chat, Projects/Inbox).
+- This means every screen should have:
+  - The same top Toolbar (with sidebar/hamburger button and dynamic title).
+  - The same bottom ChatInputField (for new chats/messages).
+- This matches the ChatGPT/Notion/Slack pattern and makes the app easier to maintain and extend.
+
+### Implementation Plan
+
+#### 1. Extract Shared Components
+- [ ] **UnifiedToolbar**
+  - Contains sidebar/hamburger button (always left-aligned).
+  - Takes a dynamic title prop: greeting, project name, or chat session name.
+  - Optional: right-side actions (settings, etc.).
+- [ ] **ChatInputField**
+  - Single source of truth for chat input UI/logic.
+  - Used in MainView, Chat overlay, and Project/Inbox screens.
+  - Optional: support matchedGeometryEffect for smooth transitions.
+
+#### 2. Refactor All Screens
+- [ ] **MainView**: Replace toolbar and chat input with shared components.
+- [ ] **ChatScreen/Overlay**: Use UnifiedToolbar (with chat session title) and ChatInputField.
+- [ ] **Project/Inbox Views**: Use UnifiedToolbar (with project/inbox name) and ChatInputField.
+- [ ] Ensure sidebar can always be opened from any screen (toolbar button always present).
+
+#### 3. Consistency & Animation
+- [ ] All screens have toolbar at top and chat input at bottom (unless intentionally hidden).
+- [ ] Chat input and toolbar animate in sync with sidebar transitions.
+
+#### 4. Accessibility & Polish
+- [ ] Ensure all toolbars and chat inputs are accessible (VoiceOver, labels, etc.).
+- [ ] Test for visual consistency and smooth animation on all device sizes.
+
+#### 5. Documentation
+- [ ] Document the unified layout/component pattern here and in architecture docs for future contributors.
+
+---
+
+**Success Criteria:**
+- Every major screen has the same navigation and chat input structure.
+- Sidebar can always be opened via toolbar button.
+- Chat input is consistent everywhere (UI, logic, animation).
+- Easy to maintain and extend.
+
+---
