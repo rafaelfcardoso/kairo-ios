@@ -79,6 +79,7 @@ struct AppMainView: View {
                             .ignoresSafeArea()
                             .contentShape(Rectangle())
                             .onTapGesture {
+                                HapticManager.shared.impact(style: .medium)
                                 withAnimation { showingSidebar = false }
                             }
                             .frame(width: geometry.size.width - min(geometry.size.width * 0.8, 320))
@@ -97,14 +98,18 @@ struct AppMainView: View {
                     .zIndex(3)
                 }
 
-                // Global Chat Input (always at the bottom)
-                if activeChatSession == nil && !focusViewModel.isExpanded && !showingSidebar {
+                // Global Chat Input (always at the bottom, slides in/out with main view)
+                if activeChatSession == nil && !focusViewModel.isExpanded {
                     GlobalChatInput(viewModel: chatViewModel)
                         .padding(
                             .bottom,
                             keyboardHandler.keyboardHeight > 0 ? keyboardHandler.keyboardHeight : geometry.safeAreaInsets.bottom
                         )
+                        .offset(x: showingSidebar ? min(geometry.size.width * 0.8, 320) : 0)
+                        .opacity(showingSidebar ? 0 : 1)
+                        .animation(.easeInOut, value: showingSidebar)
                         .animation(Animation.easeOut(duration: 0.25), value: keyboardHandler.keyboardHeight)
+                        .allowsHitTesting(!showingSidebar)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
