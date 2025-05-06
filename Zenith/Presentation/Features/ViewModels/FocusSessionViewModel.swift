@@ -25,6 +25,9 @@ class FocusSessionViewModel: ObservableObject {
     private var timer: AnyCancellable?
     private var breakTimer: AnyCancellable?
     
+    // Add a weak reference to AuthViewModel for authentication error handling
+    weak var authViewModel: AuthViewModel?
+    
     var progress: Double {
         1.0 - (remainingTime / timerDuration)
     }
@@ -60,7 +63,18 @@ class FocusSessionViewModel: ObservableObject {
                     try await registerFocusSession(taskIds: [])
                 }
             } catch {
-                print("Error registering focus session: \(error)")
+                print("🎯 [Focus] Error registering session: \(error)")
+                if let apiError = error as? APIError {
+                    switch apiError {
+                    case .unauthorized, .authenticationFailed:
+                        await MainActor.run {
+                            authViewModel?.requiresLogin = true
+                        }
+                    default:
+                        break
+                    }
+                }
+                throw error
             }
         }
     }
@@ -115,7 +129,18 @@ class FocusSessionViewModel: ObservableObject {
                     // Refresh insights after ending the session
                     await loadFocusInsights()
                 } catch {
-                    print("Error ending focus session: \(error)")
+                    print("🎯 [Focus] Error ending focus session: \(error)")
+                    if let apiError = error as? APIError {
+                        switch apiError {
+                        case .unauthorized, .authenticationFailed:
+                            await MainActor.run {
+                                authViewModel?.requiresLogin = true
+                            }
+                        default:
+                            break
+                        }
+                    }
+                    throw error
                 }
             }
         }
@@ -144,7 +169,18 @@ class FocusSessionViewModel: ObservableObject {
                     // Refresh insights after completing the session
                     await loadFocusInsights()
                 } catch {
-                    print("Error completing focus session: \(error)")
+                    print("🎯 [Focus] Error completing focus session: \(error)")
+                    if let apiError = error as? APIError {
+                        switch apiError {
+                        case .unauthorized, .authenticationFailed:
+                            await MainActor.run {
+                                authViewModel?.requiresLogin = true
+                            }
+                        default:
+                            break
+                        }
+                    }
+                    throw error
                 }
             }
         }
@@ -194,6 +230,17 @@ class FocusSessionViewModel: ObservableObject {
                     await loadFocusInsights()
                 } catch {
                     print("🎯 [Focus] Error forfeiting last completed session: \(error)")
+                    if let apiError = error as? APIError {
+                        switch apiError {
+                        case .unauthorized, .authenticationFailed:
+                            await MainActor.run {
+                                authViewModel?.requiresLogin = true
+                            }
+                        default:
+                            break
+                        }
+                    }
+                    throw error
                 }
             }
         } else {
@@ -326,25 +373,10 @@ class FocusSessionViewModel: ObservableObject {
             
             guard (200...299).contains(httpResponse.statusCode) else {
                 if httpResponse.statusCode == 401 {
-                    // Try to authenticate and retry
-                    try await APIConfig.authenticateWithToken()
-                    
-                    var retryRequest = request
-                    APIConfig.addAuthHeaders(to: &retryRequest)
-                    
-                    let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
-                    guard let retryHttpResponse = retryResponse as? HTTPURLResponse,
-                          (200...299).contains(retryHttpResponse.statusCode) else {
-                        throw APIError.invalidResponse
+                    await MainActor.run {
+                        authViewModel?.requiresLogin = true
                     }
-                    
-                    if let responseString = String(data: retryData, encoding: .utf8),
-                       let json = try? JSONSerialization.jsonObject(with: retryData) as? [String: Any],
-                       let sessionId = json["id"] as? String {
-                        print("🎯 [Focus] Retry Response: \(responseString)")
-                        self.currentSessionId = sessionId
-                    }
-                    return
+                    throw APIError.unauthorized
                 }
                 throw APIError.invalidResponse
             }
@@ -357,6 +389,16 @@ class FocusSessionViewModel: ObservableObject {
             }
         } catch {
             print("🎯 [Focus] Error registering session: \(error)")
+            if let apiError = error as? APIError {
+                switch apiError {
+                case .unauthorized, .authenticationFailed:
+                    await MainActor.run {
+                        authViewModel?.requiresLogin = true
+                    }
+                default:
+                    break
+                }
+            }
             throw error
         }
     }
@@ -413,39 +455,27 @@ class FocusSessionViewModel: ObservableObject {
                 print("🎯 [Focus] Forfeit failed with status code: \(httpResponse.statusCode)")
                 
                 if httpResponse.statusCode == 401 {
-                    // Try to authenticate and retry
-                    print("🎯 [Focus] Attempting to reauthenticate for forfeit")
-                    try await APIConfig.authenticateWithToken()
-                    
-                    var retryRequest = request
-                    APIConfig.addAuthHeaders(to: &retryRequest)
-                    
-                    let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
-                    guard let retryHttpResponse = retryResponse as? HTTPURLResponse,
-                          (200...299).contains(retryHttpResponse.statusCode) else {
-                        print("🎯 [Focus] Forfeit retry failed with status: \((retryResponse as? HTTPURLResponse)?.statusCode ?? -1)")
-                        throw APIError.invalidResponse
+                    await MainActor.run {
+                        authViewModel?.requiresLogin = true
                     }
-                    
-                    if let responseString = String(data: retryData, encoding: .utf8) {
-                        print("🎯 [Focus] Forfeit Session Retry Response: \(responseString)")
-                    }
-                    return
+                    throw APIError.unauthorized
                 }
-                
-                // If we get a 404, the session might have already been completed or doesn't exist
-                if httpResponse.statusCode == 404 {
-                    print("🎯 [Focus] Session not found (404). It may have already been completed or doesn't exist.")
-                    // We'll consider this a success since we want to reset the session anyway
-                    return
-                }
-                
                 throw APIError.invalidResponse
             }
             
             print("🎯 [Focus] Session forfeited successfully")
         } catch {
             print("🎯 [Focus] Error forfeiting session: \(error)")
+            if let apiError = error as? APIError {
+                switch apiError {
+                case .unauthorized, .authenticationFailed:
+                    await MainActor.run {
+                        authViewModel?.requiresLogin = true
+                    }
+                default:
+                    break
+                }
+            }
             throw error
         }
     }
@@ -504,6 +534,16 @@ class FocusSessionViewModel: ObservableObject {
             
         } catch {
             print("🎯 [Focus] Error loading insights: \(error)")
+            if let apiError = error as? APIError {
+                switch apiError {
+                case .unauthorized, .authenticationFailed:
+                    await MainActor.run {
+                        authViewModel?.requiresLogin = true
+                    }
+                default:
+                    break
+                }
+            }
         }
     }
     
@@ -530,22 +570,10 @@ class FocusSessionViewModel: ObservableObject {
             
             guard (200...299).contains(httpResponse.statusCode) else {
                 if httpResponse.statusCode == 401 {
-                    // Try to authenticate and retry
-                    try await APIConfig.authenticateWithToken()
-                    
-                    var retryRequest = request
-                    APIConfig.addAuthHeaders(to: &retryRequest)
-                    
-                    let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
-                    guard let retryHttpResponse = retryResponse as? HTTPURLResponse,
-                          (200...299).contains(retryHttpResponse.statusCode) else {
-                        throw APIError.invalidResponse
+                    await MainActor.run {
+                        authViewModel?.requiresLogin = true
                     }
-                    
-                    if let json = try? JSONSerialization.jsonObject(with: retryData) as? [[String: Any]] {
-                        return json
-                    }
-                    return []
+                    throw APIError.unauthorized
                 }
                 throw APIError.invalidResponse
             }
@@ -557,6 +585,16 @@ class FocusSessionViewModel: ObservableObject {
             
         } catch {
             print("🎯 [Focus] Error fetching session history: \(error)")
+            if let apiError = error as? APIError {
+                switch apiError {
+                case .unauthorized, .authenticationFailed:
+                    await MainActor.run {
+                        authViewModel?.requiresLogin = true
+                    }
+                default:
+                    break
+                }
+            }
             throw error
         }
     }
@@ -611,24 +649,10 @@ class FocusSessionViewModel: ObservableObject {
                 print("🎯 [Focus] Complete failed with status code: \(httpResponse.statusCode)")
                 
                 if httpResponse.statusCode == 401 {
-                    // Try to authenticate and retry
-                    print("🎯 [Focus] Attempting to reauthenticate for complete")
-                    try await APIConfig.authenticateWithToken()
-                    
-                    var retryRequest = request
-                    APIConfig.addAuthHeaders(to: &retryRequest)
-                    
-                    let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
-                    guard let retryHttpResponse = retryResponse as? HTTPURLResponse,
-                          (200...299).contains(retryHttpResponse.statusCode) else {
-                        print("🎯 [Focus] Complete retry failed with status: \((retryResponse as? HTTPURLResponse)?.statusCode ?? -1)")
-                        throw APIError.invalidResponse
+                    await MainActor.run {
+                        authViewModel?.requiresLogin = true
                     }
-                    
-                    if let responseString = String(data: retryData, encoding: .utf8) {
-                        print("🎯 [Focus] Complete Session Retry Response: \(responseString)")
-                    }
-                    return
+                    throw APIError.unauthorized
                 }
                 
                 // If we get a 404, the session might have already been completed or doesn't exist
@@ -644,6 +668,16 @@ class FocusSessionViewModel: ObservableObject {
             print("🎯 [Focus] Session completed successfully")
         } catch {
             print("🎯 [Focus] Error completing session: \(error)")
+            if let apiError = error as? APIError {
+                switch apiError {
+                case .unauthorized, .authenticationFailed:
+                    await MainActor.run {
+                        authViewModel?.requiresLogin = true
+                    }
+                default:
+                    break
+                }
+            }
             throw error
         }
     }

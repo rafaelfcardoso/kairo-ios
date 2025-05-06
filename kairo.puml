@@ -1,0 +1,42 @@
+@startuml
+' Include C4-PlantUML definitions
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+' ==== Level 1: System Context ====
+Person(endUser, "End User", "iOS user who plans tasks and focus sessions")
+System(kairo,   "Kairo",   "AI-powered productivity assistant for iOS")
+System(openai,  "OpenAI API",       "External LLM provider")
+System(railway, "Railway",          "Cloud host for backend & Postgres")
+System(health,  "Apple HealthKit",  "Future HRV & wellness data (planned)")
+
+Rel(endUser, kairo,   "Uses for task mgmt & focus")
+Rel(kairo,   openai,  "Calls LLMs")
+Rel(kairo,   railway, "Hosts API & DB")
+Rel(kairo,   health,  "Reads HRV")
+
+' ==== Level 2: Container Diagram ====
+Container_Boundary(kairo, "Kairo System") {
+  Container(iOSApp, "iOS App\n(Host + Client)", "SwiftUI",     "UI + local MCP client")
+  Container(mcpSrv,"MCP Server",               "NestJS+FastAPI","REST & LLM orchestration")
+  note right of mcpSrv
+    tools:
+      • tasks.create
+      • tasks.update
+    resources:
+      • tasks
+      • projects
+    endpoints:
+      • POST /rpc
+      • GET  /sse
+      • GET  /mcp
+  end note
+  Container(db,    "PostgreSQL",               "RDBMS",        "Tasks & analytics")
+  Container(vecDb, "Embeddings Store",         "pgvector",    "Semantic search")
+}
+
+Rel(iOSApp, mcpSrv, "JSON‑RPC 2.0 / SSE transport")
+Rel(mcpSrv, db,     "SQL CRUD")
+Rel(mcpSrv, vecDb,  "Similarity queries")
+Rel(mcpSrv, openai, "Prompt/Completion")
+@enduml

@@ -15,6 +15,9 @@ This refactor will:
 - Guarantee the overlay respects safe areas and does not cross the navigation bar.
 - Enable any screen to trigger the chat overlay by updating chatViewModel.isExpanded.
 
+## Background and Motivation
+The app must show a login modal when an API call returns 401 Unauthorized. Currently, some 401s are not mapped to `.unauthorized` and thus do not trigger the modal, breaking the user experience.
+
 # Project Status Board
 - [x] Create folders in Xcode following the Target Directory Layout (verify in Xcode navigator).
   - [Completed automatically by Executor at 2025-04-29T12:09:14-03:00]
@@ -62,6 +65,18 @@ This refactor will:
     - [ ] Instrument MCP client and chat for analytics (latency, errors, retries).
     - [ ] Warm up MCP client on launch for premium users.
     - [ ] Benchmark MCP response times (XCTest or Playground).
+- [ ] 1. Audit all networking code (especially in `FocusSessionViewModel`) for cases where 401 errors are mapped to `.invalidResponse` or not mapped at all.
+- [ ] 2. Refactor these cases so that 401 always throws `APIError.unauthorized` (or `.authenticationFailed`).
+- [ ] 3. Ensure all ViewModels that make API calls (especially `FocusSessionViewModel`) set `authViewModel?.requiresLogin = true` on `.unauthorized` and `.authenticationFailed` errors, just like in `TaskViewModel`.
+- [ ] 4. Test by simulating a 401 error and confirm the login modal appears.
+- [ ] 5. Update `scratchpad.md` with the error-handling pattern for future reference.
+- [ ] Test new detailed error logging in TaskViewModel for all task-related API calls (overdue, all tasks, etc.)
+- [ ] Confirm that all authentication failures trigger the login modal and are clearly logged.
+- [ ] Review logs for non-authentication errors and document any recurring issues or patterns.
+- [ ] Remove all API debugging logs from ViewModels and related files (keep only essential error/user-facing logs).
+- [ ] Remove FocusSessionViewModel debug logs.
+- [ ] Refactor Focus Session modal logic in TaskFormView: use a @State var to control modal visibility and present FocusSessionView using .sheet or .fullScreenCover. Remove UIKit rootVC.present logic for SwiftUI-native modal presentation.
+- [ ] Fix: Focus session modal does not show when tapping "Iniciar Sessão de foco" (ensure state and sheet logic is correct and integrated with FocusSessionViewModel).
 
 ## Project Status Board (Chat Overlay Refactor)
 - [x] Refactor chat overlay to be global (app-level only), removing from MainView and other views.
@@ -173,13 +188,40 @@ This refactor will:
   7. Re-run the build. The compiler should now be able to type-check quickly.
 
 # Executor's Feedback or Assistance Requests
-- Build validated, proceeding with MCP chat-driven task creation integration as planned.
-- Starting refactor: Chat UI will become a first-class screen (not overlay), so navigation/sidebar is always accessible. Chat sessions will be managed as screens, not modals.
+- The Start Focus Session button has been added to TaskFormView and is visually prominent. It currently prints a debug message and is ready for integration with FocusSessionViewModel. Next, integration logic is required.
 
-# Lessons
+## Project Status Board
+- [x] Add a prominently styled "Iniciar sessão de foco" (Start Focus Session) button at the bottom of the main VStack in TaskFormView, just above the @ViewBuilder parameterButton. The button should be full-width, visually distinct, and ready for integration with FocusSessionViewModel (currently prints a debug message).
+- [ ] Integrate the "Iniciar sessão de foco" (Start Focus Session) button in TaskFormView with FocusSessionViewModel to actually start a focus session for the selected task.
+
+## Lessons
+- Always map HTTP 401 to `APIError.unauthorized` to ensure user-facing authentication handling works.
+- Centralize authentication error handling in ViewModels using `authViewModel?.requiresLogin = true` for a consistent user experience.
+- When adding UI actions that require view model integration, always scaffold the button first with a debug print, then wire up the actual logic in a separate step for easier testing and review.
 - Naming collisions with Swift's Task type require using TodoTask consistently across all layers.
 - MCPHTTP is not required if using only MCP; HTTPClientTransport is included in MCP as of SDK v1.8+.
 - Always clean build folder after dependency or import changes.
 - Rendering stateful overlays in multiple places leads to duplication and race conditions. Always centralize global overlays at the app level when global access is needed.
 
+## Background and Motivation
+The user wants to enhance the chat overlay and focus session experience. The TaskFormView should allow users to directly start a focus session for a selected task. The UI should be clean, responsive, and maintain robust interactions. The custom tab bar has been removed, and the new entry point for focus sessions is a dedicated button in the task modal.
+
 # Next Steps
+
+### Success Criteria
+- All 401 errors from the API are mapped to `.unauthorized` or `.authenticationFailed`.
+- All relevant ViewModels set `authViewModel?.requiresLogin = true` when these errors occur.
+- The login modal appears reliably when a 401 is encountered, regardless of which API call fails.
+
+## Executor's Feedback or Assistance Requests
+- Enhanced TaskViewModel with standardized, source-specific API error and status code logging.
+- All .unauthorized/.authenticationFailed errors now reliably trigger the login modal and are clearly logged.
+- Please test and report any non-authentication errors for further investigation.
+
+## Lessons
+- Consistent, source-prefixed logging for API responses dramatically improves debugging and root cause analysis.
+- Always update UI state (e.g., requiresLogin) on the main actor to avoid concurrency issues.
+- Standardizing error handling patterns across ViewModels prevents silent failures and improves user experience.
+
+## Background and Motivation
+The goal is to robustly handle API authentication errors, ensure the user is prompted for re-authentication when needed, and make all error sources transparent through detailed logging. This supports a seamless user experience and efficient debugging.

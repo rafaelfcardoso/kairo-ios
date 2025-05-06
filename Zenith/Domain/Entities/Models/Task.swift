@@ -14,7 +14,7 @@ struct TodoTask: Identifiable, Codable {
     let updatedAt: String
     let project: Project?
     let tags: [Tag]
-    let focusSessions: [FocusSession]
+    let focusSessions: [FocusSession]?
     let isRecurring: Bool?
     let needsReminder: Bool?
 }

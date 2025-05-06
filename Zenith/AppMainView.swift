@@ -13,6 +13,7 @@ struct AppMainView: View {
     @Binding var selectedTab: Tab
     @Binding var isAuthenticated: Bool
     @State private var activeChatSession: ChatSession? = nil
+    @StateObject private var authViewModel = AuthViewModel()
     
     var body: some View {
         GeometryReader { geometry in
@@ -23,8 +24,8 @@ struct AppMainView: View {
                     .onTapGesture { hideKeyboard() }
                     .ignoresSafeArea()
 
-                ZStack {
-                    // Main content area
+                ZStack(alignment: .leading) {
+                    // Main content and dimming overlay
                     Group {
                         switch selectedTab {
                         case .today:
@@ -43,9 +44,20 @@ struct AppMainView: View {
                             }
                         }
                     }
-                    .zIndex(0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .disabled(showingSidebar)
 
-                    // Sidebar
+                    // Dimming overlay covers only main content
+                    if showingSidebar {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                withAnimation { showingSidebar = false }
+                            }
+                            .zIndex(1)
+                    }
+
+                    // Sidebar slides over content
                     if showingSidebar {
                         SidebarMenu(
                             taskViewModel: taskViewModel,
@@ -54,10 +66,12 @@ struct AppMainView: View {
                             chatSessionsViewModel: chatSessionsViewModel,
                             onSelectChatSession: { session in
                                 activeChatSession = session
-                                selectedTab = .today // Or a dedicated .chat tab if you prefer
+                                selectedTab = .today
                             }
                         )
                         .environmentObject(projectViewModel)
+                        .frame(width: 270)
+                        .transition(.move(edge: .leading))
                         .zIndex(2)
                     }
 
@@ -66,17 +80,14 @@ struct AppMainView: View {
                         NavigationStack {
                             ChatScreen(sessionsViewModel: chatSessionsViewModel)
                         }
-                        .zIndex(1)
+                        .zIndex(3)
                     }
                 }
-                .onAppear {
-                    print("[GeometryReader] size.height: \(geometry.size.height), safeAreaInsets.bottom: \(geometry.safeAreaInsets.bottom)")
-                }
+                .animation(.easeInOut, value: showingSidebar)
 
                 // Global Chat Input (always at the bottom)
                 if activeChatSession == nil && !focusViewModel.isExpanded && !showingSidebar {
                     GlobalChatInput(viewModel: chatViewModel)
-                        .background(Color.red.opacity(0.3))
                         .padding(
                             .bottom,
                             keyboardHandler.keyboardHeight > 0 ? keyboardHandler.keyboardHeight : geometry.safeAreaInsets.bottom
@@ -86,6 +97,11 @@ struct AppMainView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea(edges: .bottom)
+            // --- AUTH MODAL ---
+            .fullScreenCover(isPresented: $authViewModel.requiresLogin, content: {
+                LoginView()
+                    .environmentObject(authViewModel)
+            })
         }
         .onAppear {
             print("[AppMainView] Rendered with GeometryReader-rooted overlay")

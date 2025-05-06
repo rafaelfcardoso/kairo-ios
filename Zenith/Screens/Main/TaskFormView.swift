@@ -189,6 +189,8 @@ struct TaskFormView: View {
     @State private var isLoadingProjects = true
     @State private var showingDatePicker = false
     @State private var error: Error?
+    @State private var isShowingFocusSession = false
+    @State private var focusSessionViewModel: FocusSessionViewModel? = nil
     
     private let inboxProjectId = "569c363f-1934-4e69-b324-6c2fad28bc59"
     let existingTask: TodoTask?
@@ -712,6 +714,52 @@ struct TaskFormView: View {
                     .background(backgroundColor)
                     
                     Spacer()
+                    
+                    // --- Start Focus Session Button ---
+                    Button(action: {
+                        let newFocusSessionViewModel = FocusSessionViewModel()
+                        newFocusSessionViewModel.selectedTask = existingTask ?? TodoTask(
+                            id: UUID().uuidString,
+                            title: taskTitle,
+                            description: taskDescription,
+                            status: "pending",
+                            priority: selectedPriority?.rawValue ?? "medium",
+                            dueDate: nil,
+                            hasTime: false,
+                            estimatedMinutes: 0,
+                            isArchived: false,
+                            createdAt: "",
+                            updatedAt: "",
+                            project: selectedProject,
+                            tags: [],
+                            focusSessions: [],
+                            isRecurring: false,
+                            needsReminder: false
+                        )
+                        self.focusSessionViewModel = newFocusSessionViewModel
+                        self.isShowingFocusSession = true
+                    }) {
+                        HStack {
+                            Image(systemName: "play.fill")
+                            Text("Iniciar sessão de foco")
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(Color.accentColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
+                    .sheet(isPresented: $isShowingFocusSession) {
+                        if let focusSessionViewModel = focusSessionViewModel {
+                            FocusSessionView()
+                                .environmentObject(viewModel)
+                                .environmentObject(focusSessionViewModel)
+                        }
+                    }
+                    // --- End Start Focus Session Button ---
                 }
             }
             .navigationBarTitleDisplayMode(.inline)

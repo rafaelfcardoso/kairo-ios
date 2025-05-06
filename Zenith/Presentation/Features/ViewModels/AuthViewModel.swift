@@ -8,6 +8,7 @@ class AuthViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var userName: String = ""
+    @Published var requiresLogin: Bool = false
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -19,9 +20,11 @@ class AuthViewModel: ObservableObject {
             userName = response.user.name
             // Persist token (handled in AuthService)
             isLoading = false
+            requiresLogin = false // Clear flag on successful login
         } catch {
             isLoading = false
             errorMessage = error.localizedDescription
+            requiresLogin = true // Set flag on login failure
         }
     }
 
@@ -30,5 +33,6 @@ class AuthViewModel: ObservableObject {
         userName = ""
         email = ""
         password = ""
+        requiresLogin = true // Set flag on logout
     }
 }

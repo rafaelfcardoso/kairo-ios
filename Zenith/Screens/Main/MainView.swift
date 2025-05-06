@@ -120,83 +120,86 @@ struct MainView: View {
     }
     
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            // Main content only; chat overlay is now global at app level
-            VStack {
-                if viewModel.isLoading {
-                    ProgressView()
-                        .padding(.top, 100)
-                } else if hasError && !viewModel.isOfflineMode {
-                    ErrorView(
-                        secondaryTextColor: secondaryTextColor,
-                        textColor: textColor,
-                        errorMessage: errorMessage ?? "Erro desconhecido. Tente novamente mais tarde.",
-                        onRetry: { Task { await performTaskLoad() } }
-                    )
-                } else {
-                    if !displayedTasks.isEmpty {
-                        TaskContentView(
-                            selectedProject: $selectedProject,
-                            selectedTab: $selectedTab,
-                            viewModel: viewModel,
-                            showingCreateTask: $showingCreateTask,
+        ZStack {
+            NavigationStack(path: $navigationPath) {
+                // Main content only; chat overlay is now global at app level
+                VStack {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .padding(.top, 100)
+                    } else if hasError && !viewModel.isOfflineMode {
+                        ErrorView(
                             secondaryTextColor: secondaryTextColor,
-                            cardBackgroundColor: cardBackgroundColor,
-                            displayedTasks: displayedTasks,
-                            onLoadTasks: { @Sendable in await self.performTaskLoad() }
+                            textColor: textColor,
+                            errorMessage: errorMessage ?? "Erro desconhecido. Tente novamente mais tarde.",
+                            onRetry: { Task { await performTaskLoad() } }
                         )
                     } else {
-                        // Optionally, show an empty state view here
-                        TaskContentView(
-                            selectedProject: $selectedProject,
-                            selectedTab: $selectedTab,
-                            viewModel: viewModel,
-                            showingCreateTask: $showingCreateTask,
-                            secondaryTextColor: secondaryTextColor,
-                            cardBackgroundColor: cardBackgroundColor,
-                            displayedTasks: displayedTasks,
-                            onLoadTasks: { @Sendable in await self.performTaskLoad() }
-                        )
+                        if !displayedTasks.isEmpty {
+                            TaskContentView(
+                                selectedProject: $selectedProject,
+                                selectedTab: $selectedTab,
+                                viewModel: viewModel,
+                                showingCreateTask: $showingCreateTask,
+                                secondaryTextColor: secondaryTextColor,
+                                cardBackgroundColor: cardBackgroundColor,
+                                displayedTasks: displayedTasks,
+                                onLoadTasks: { @Sendable in await self.performTaskLoad() }
+                            )
+                        } else {
+                            // Optionally, show an empty state view here
+                            TaskContentView(
+                                selectedProject: $selectedProject,
+                                selectedTab: $selectedTab,
+                                viewModel: viewModel,
+                                showingCreateTask: $showingCreateTask,
+                                secondaryTextColor: secondaryTextColor,
+                                cardBackgroundColor: cardBackgroundColor,
+                                displayedTasks: displayedTasks,
+                                onLoadTasks: { @Sendable in await self.performTaskLoad() }
+                            )
+                        }
                     }
                 }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { sidebarButton }
-                ToolbarItem(placement: .principal) { titleView }
-                ToolbarItem(placement: .navigationBarTrailing) { addButton }
-            }
-            .task { await performTaskLoad() }
-            .sheet(isPresented: $showingCreateTask) {
-                CreateTaskFormView(
-                    viewModel: viewModel,
-                    onTaskSaved: { @Sendable in Task { await self.performTaskLoad() } }
-                )
-                .presentationDetents([.medium, .large])
-            }
-            .onChange(of: selectedProject) { _, _ in
-                Task {
-                    await performTaskLoad()
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) { sidebarButton }
+                    ToolbarItem(placement: .principal) { titleView }
+                    ToolbarItem(placement: .navigationBarTrailing) { addButton }
                 }
-            }
-            .navigationDestination(for: Project.self) { project in
-                if project.isSystem {
-                    InboxView()
-                        .environmentObject(viewModel)
-                } else {
-                    ProjectTasksView(project: project)
-                        .environmentObject(viewModel)
+                .task { await performTaskLoad() }
+                .sheet(isPresented: $showingCreateTask) {
+                    CreateTaskFormView(
+                        viewModel: viewModel,
+                        onTaskSaved: { @Sendable in Task { await self.performTaskLoad() } }
+                    )
+                    .presentationDetents([.medium, .large])
                 }
-            }
-            .onAppear {
-                viewModel.refreshAfterLogin()
+                .onChange(of: selectedProject) { _, _ in
+                    Task {
+                        await performTaskLoad()
+                    }
+                }
+                .navigationDestination(for: Project.self) { project in
+                    if project.isSystem {
+                        InboxView()
+                            .environmentObject(viewModel)
+                    } else {
+                        ProjectTasksView(project: project)
+                            .environmentObject(viewModel)
+                    }
+                }
+                .onAppear {
+                    viewModel.refreshAfterLogin()
+                }
             }
         }
     }
-    
-    // MARK: - Toolbar Components
-    
-    private var sidebarButton: some View {
+}
+
+// MARK: - Toolbar Components
+private extension MainView {
+    var sidebarButton: some View {
         Button {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 showingSidebar = true
@@ -209,21 +212,20 @@ struct MainView: View {
         }
         .accessibilityLabel("Open sidebar")
     }
-    
-    private var titleView: some View {
+
+    var titleView: some View {
         VStack(spacing: 2) {
             Text(viewModel.greeting)
                 .font(.headline)
                 .foregroundColor(textColor)
                 .accessibilityIdentifier("TodayGreeting")
-            
             Text(viewModel.formattedDate)
                 .font(.subheadline)
                 .foregroundColor(secondaryTextColor)
         }
     }
-    
-    private var addButton: some View {
+
+    var addButton: some View {
         Button {
             showingCreateTask = true
         } label: {
@@ -234,39 +236,29 @@ struct MainView: View {
         .accessibilityLabel("Add task")
         .accessibilityIdentifier("add-task-button")
     }
-    
+
     // MARK: - Data Loading
-    
-    private func loadTasks() async throws {
+    func loadTasks() async throws {
         if selectedProject != nil {
-            // Load tasks for the specific project
-            try await viewModel.loadAllTasks() // Load all tasks then filter in displayedTasks
+            try await viewModel.loadAllTasks()
         } else {
-            // Load normal tasks (today + overdue)
             try await viewModel.loadAllTasks()
         }
     }
-    
-    // Add a simplified handler for loading tasks that automatically handles errors
+
     @Sendable
-    private func performTaskLoad() async {
+    func performTaskLoad() async {
         isLoading = true
         errorMessage = nil
-        
         do {
             if selectedProject != nil {
-                // If a project is selected, load tasks for that project
                 try await viewModel.loadTasks()
             } else {
-                // Otherwise, load tasks based on the selected filter
                 try await viewModel.loadTasks()
             }
-            
             hasError = false
         } catch {
             hasError = true
-            
-            // Extract a user-friendly error message
             if let apiError = error as? APIError {
                 switch apiError {
                 case .decodingError:
@@ -285,10 +277,8 @@ struct MainView: View {
             } else {
                 errorMessage = "Erro ao carregar tarefas: \(error.localizedDescription)"
             }
-            
             print("Error loading tasks: \(error)")
         }
-        
         isLoading = false
     }
 }

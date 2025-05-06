@@ -1,6 +1,5 @@
 import Foundation
 import AVFoundation
-import UIKit
 import AudioToolbox
 
 @MainActor
@@ -16,6 +15,8 @@ class TaskViewModel: ObservableObject {
     @Published var focusSessionHistory: [(date: Date, duration: TimeInterval)] = []
     @Published var isOfflineMode = false
     @Published var lastSuccessfulSync: Date? = nil
+    
+    weak var authViewModel: AuthViewModel?
     
     private let baseURL = APIConfig.baseURL
     private var currentTask: Task<Void, Error>? // This is a Swift concurrency task
@@ -42,13 +43,22 @@ class TaskViewModel: ObservableObject {
         // Load cached data from disk
         loadOfflineCacheFromDisk()
         
-        // Observe when app becomes active
+        // Observe when app becomes active (cross-platform)
+        #if os(iOS)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(updateOnForeground),
-            name: UIApplication.didBecomeActiveNotification,
+            name: NSNotification.Name.NSExtensionHostDidBecomeActive,
             object: nil
         )
+        #elseif os(macOS)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(updateOnForeground),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
+        #endif
     }
     
     deinit {
@@ -82,6 +92,7 @@ class TaskViewModel: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
+                print("[API DEBUG] Response is not HTTPURLResponse: \(response)")
                 throw APIError.invalidResponse
             }
             
@@ -148,30 +159,22 @@ class TaskViewModel: ObservableObject {
     // Save offline cache to disk
     private func saveOfflineCacheToDisk() {
         let encoder = JSONEncoder()
-        
-        // Save tasks cache
         if !offlineTasksCache.isEmpty {
             do {
                 let data = try encoder.encode(offlineTasksCache)
                 UserDefaults.standard.set(data, forKey: tasksCacheKey)
-                print("🌐 [Tasks] Saved \(offlineTasksCache.count) tasks to local cache")
             } catch {
                 print("🌐 [Tasks] Error saving tasks to cache: \(error)")
             }
         }
-        
-        // Save overdue tasks cache
         if !offlineOverdueTasksCache.isEmpty {
             do {
                 let data = try encoder.encode(offlineOverdueTasksCache)
                 UserDefaults.standard.set(data, forKey: overdueTasksCacheKey)
-                print("🌐 [Tasks] Saved \(offlineOverdueTasksCache.count) overdue tasks to local cache")
             } catch {
                 print("🌐 [Tasks] Error saving overdue tasks to cache: \(error)")
             }
         }
-        
-        // Save last sync time
         if let lastSync = lastSuccessfulSync {
             UserDefaults.standard.set(lastSync, forKey: lastSyncKey)
         }
@@ -180,42 +183,30 @@ class TaskViewModel: ObservableObject {
     // Load offline cache from disk
     private func loadOfflineCacheFromDisk() {
         let decoder = JSONDecoder()
-        
-        // Load tasks cache
         if let data = UserDefaults.standard.data(forKey: tasksCacheKey) {
             do {
                 let cachedTasks = try decoder.decode([TodoTask].self, from: data)
                 self.offlineTasksCache = cachedTasks
-                
-                // If we have cached tasks, use them initially
                 if !cachedTasks.isEmpty && self.tasks.isEmpty {
                     self.tasks = cachedTasks
                     self.isOfflineMode = true
-                    print("🌐 [Tasks] Loaded \(cachedTasks.count) tasks from local cache")
                 }
             } catch {
                 print("🌐 [Tasks] Error loading tasks from cache: \(error)")
             }
         }
-        
-        // Load overdue tasks cache
         if let data = UserDefaults.standard.data(forKey: overdueTasksCacheKey) {
             do {
                 let cachedOverdueTasks = try decoder.decode([TodoTask].self, from: data)
                 self.offlineOverdueTasksCache = cachedOverdueTasks
-                
-                // If we have cached overdue tasks, use them initially
                 if !cachedOverdueTasks.isEmpty && self.overdueTasks.isEmpty {
                     self.overdueTasks = cachedOverdueTasks
                     self.isOfflineMode = true
-                    print("🌐 [Tasks] Loaded \(cachedOverdueTasks.count) overdue tasks from local cache")
                 }
             } catch {
                 print("🌐 [Tasks] Error loading overdue tasks from cache: \(error)")
             }
         }
-        
-        // Load last sync time
         if let lastSync = UserDefaults.standard.object(forKey: lastSyncKey) as? Date {
             self.lastSuccessfulSync = lastSync
         }
@@ -254,22 +245,11 @@ class TaskViewModel: ObservableObject {
                     throw APIError.invalidURL(urlComponents.description)
                 }
                 
-                // Removed excessive URL logging
-                
                 var request = URLRequest(url: url)
                 request.setValue("application/json", forHTTPHeaderField: "accept")
                 APIConfig.addAuthHeaders(to: &request)
                 
                 let decodedTasks: [TodoTask] = try await executeRequest(request)
-                print("🌐 [Tasks] Successfully loaded \(decodedTasks.count) tasks")
-                
-                // Check if the specific task is in the loaded tasks
-                let specificTaskID = "91056be9-f329-4d22-8626-eef4a0f3b19d"
-                if decodedTasks.contains(where: { $0.id == specificTaskID }) {
-                    print("🌐 [Tasks] Specific task found in API response")
-                } else {
-                    print("🌐 [Tasks] Specific task NOT found in API response")
-                }
                 
                 // Store in offline cache
                 self.offlineTasksCache = decodedTasks
@@ -281,119 +261,63 @@ class TaskViewModel: ObservableObject {
                 
                 // Process tasks to avoid duplicates between overdue and today's tasks
                 await MainActor.run {
-                    // Get the IDs of tasks that are already in the overdueTasks collection
                     let overdueTaskIds = Set(self.overdueTasks.map { $0.id })
-                    
-                    // Filter out tasks that are already in the overdueTasks collection
                     let filteredTasks = decodedTasks.filter { !overdueTaskIds.contains($0.id) }
-                    
                     if forToday {
-                        // Filter for today's tasks
                         let calendar = Calendar.current
                         let today = calendar.startOfDay(for: Date())
                         let dateFormatter = ISO8601DateFormatter()
                         dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                        
                         self.tasks = filteredTasks.filter { task in
-                            // Special case for the specific task
-                            if task.id == specificTaskID {
-                                print("🌐 [Tasks] Found the specific task: \(task.title) - Including in today's tasks")
-                                return true // Always include this specific task
-                            }
-                            
-                            // Include tasks without a due date
-                            if task.dueDate == nil {
-                                return true
-                            }
-                            
-                            // Include recurring tasks
-                            if let isRecurring = task.isRecurring, isRecurring {
-                                return true
-                            }
-                            
-                            guard let dueDateString = task.dueDate else {
-                                return false
-                            }
-                            
-                            guard let dueDate = dateFormatter.date(from: dueDateString) else {
-                                return false
-                            }
-                            
+                            if task.dueDate == nil { return true }
+                            if let isRecurring = task.isRecurring, isRecurring { return true }
+                            guard let dueDateString = task.dueDate else { return false }
+                            guard let dueDate = dateFormatter.date(from: dueDateString) else { return false }
                             let taskDay = calendar.startOfDay(for: dueDate)
                             let isToday = calendar.isDate(taskDay, inSameDayAs: today)
-                            
                             return isToday
                         }
                     } else {
                         self.tasks = filteredTasks
                     }
-                    
                     self.isLoading = false
                 }
             } catch {
+                if error is CancellationError {
+                    print("🌐 [Tasks] Task loading was cancelled (not an error).")
+                    return
+                }
                 print("🌐 [Tasks] Error loading tasks: \(error.localizedDescription)")
-                
-                // Switch to offline mode if we have cached data
                 if !self.offlineTasksCache.isEmpty {
-                    print("🌐 [Tasks] Switching to offline mode with \(self.offlineTasksCache.count) cached tasks")
                     self.isOfflineMode = true
-                    
                     if forToday {
-                        // Filter cached tasks for today
                         let calendar = Calendar.current
                         let today = calendar.startOfDay(for: Date())
                         let dateFormatter = ISO8601DateFormatter()
                         dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                        
-                        let specificTaskID = "91056be9-f329-4d22-8626-eef4a0f3b19d"
                         tasks = self.offlineTasksCache.filter { task in
-                            // Special case for the specific task
-                            if task.id == specificTaskID {
-                                print("🌐 [Tasks] Found the specific task: \(task.title) - Including in today's tasks")
-                                return true // Always include this specific task
-                            }
-                            
-                            // Include tasks without a due date
-                            if task.dueDate == nil {
-                                return true
-                            }
-                            
-                            // Include recurring tasks
-                            if let isRecurring = task.isRecurring, isRecurring {
-                                return true
-                            }
-                            
-                            guard let dueDateString = task.dueDate else {
-                                return false
-                            }
-                            
-                            guard let dueDate = dateFormatter.date(from: dueDateString) else {
-                                return false
-                            }
-                            
+                            if task.dueDate == nil { return true }
+                            if let isRecurring = task.isRecurring, isRecurring { return true }
+                            guard let dueDateString = task.dueDate else { return false }
+                            guard let dueDate = dateFormatter.date(from: dueDateString) else { return false }
                             let taskDay = calendar.startOfDay(for: dueDate)
                             let isToday = calendar.isDate(taskDay, inSameDayAs: today)
-                            
                             return isToday
                         }
                     } else {
                         tasks = self.offlineTasksCache
                     }
                 } else {
-                    // No cached data available, propagate the error
                     if let apiError = error as? APIError {
                         switch apiError {
-                        case .decodingError(let decodingError):
-                            print("🌐 [Tasks] Decoding error details: \(decodingError)")
-                        case .clientError(let code, let message):
-                            print("🌐 [Tasks] Client error (\(code)): \(message)")
-                        case .serverError(let code, let message):
-                            print("🌐 [Tasks] Server error (\(code)): \(message)")
+                        case .unauthorized, .authenticationFailed:
+                            await MainActor.run {
+                                authViewModel?.requiresLogin = true
+                            }
                         default:
-                            print("🌐 [Tasks] API error: \(apiError.localizedDescription)")
+                            break
                         }
                     }
-                    throw error
                 }
             }
         }
@@ -496,7 +420,6 @@ class TaskViewModel: ObservableObject {
         ]
         
         print("🕒 [NLP] Using timezone context: \(userContext)")
-        print("🌐 [AI] Sending request to: \(endpoint)")
         
         let body: [String: Any] = [
             "command": command,
@@ -586,52 +509,88 @@ class TaskViewModel: ObservableObject {
                 throw APIError.invalidURL(urlComponents.description)
             }
             
-            // Removed excessive URL logging
-            
             var request = URLRequest(url: url)
             request.setValue("application/json", forHTTPHeaderField: "accept")
             APIConfig.addAuthHeaders(to: &request)
             
-            let fetchedOverdueTasks: [TodoTask] = try await executeRequest(request)
-            
-            // Get the IDs of tasks that are already in the regular tasks collection
-            let regularTaskIds = Set(tasks.map { $0.id })
-            
-            // Filter out tasks that are already in the regular tasks collection
-            let uniqueOverdueTasks = fetchedOverdueTasks.filter { !regularTaskIds.contains($0.id) }
-            
-            // Update the overdue tasks collection
-            overdueTasks = uniqueOverdueTasks
-            
-            self.offlineOverdueTasksCache = overdueTasks
-            self.lastOverdueFetchTime = Date()
-            self.isOfflineMode = false
-            
-            // Save to disk
-            saveOfflineCacheToDisk()
-            
-            print("🌐 [Tasks] Successfully loaded \(overdueTasks.count) overdue tasks")
+            do {
+                let fetchedOverdueTasks: [TodoTask] = try await executeRequest(request)
+                print("🌐 [Tasks] Successfully loaded \(fetchedOverdueTasks.count) overdue tasks")
+                
+                let regularTaskIds = Set(tasks.map { $0.id })
+                
+                // Filter out tasks that are already in the regular tasks collection
+                let uniqueOverdueTasks = fetchedOverdueTasks.filter { !regularTaskIds.contains($0.id) }
+                
+                // Update the overdue tasks collection
+                overdueTasks = uniqueOverdueTasks
+                
+                self.offlineOverdueTasksCache = overdueTasks
+                self.lastOverdueFetchTime = Date()
+                self.isOfflineMode = false
+                
+                // Save to disk
+                saveOfflineCacheToDisk()
+                print("🌐 [Tasks] Successfully loaded \(overdueTasks.count) overdue tasks")
+            } catch {
+                if let apiError = error as? APIError {
+                    switch apiError {
+                    case .unauthorized, .authenticationFailed:
+                        await MainActor.run {
+                            authViewModel?.requiresLogin = true
+                        }
+                        print("🌐 [Tasks][Overdue] Unauthorized: triggering login modal.")
+                    case .decodingError(let decodingError):
+                        print("🌐 [Tasks][Overdue] Decoding error details: \(decodingError)")
+                        if let decodingError = decodingError as? DecodingError {
+                            print("🌐 [Tasks][Overdue] DecodingError: \(decodingError)")
+                        }
+                    case .clientError(let code, let message):
+                        print("🌐 [Tasks][Overdue] Client error (\(code)): \(message)")
+                    case .serverError(let code, let message):
+                        print("🌐 [Tasks][Overdue] Server error (\(code)): \(message)")
+                    default:
+                        print("🌐 [Tasks][Overdue] API error: \(apiError.localizedDescription)")
+                    }
+                }
+                if let urlError = error as? URLError {
+                    print("🌐 [Tasks][Overdue] URLError: \(urlError)")
+                }
+                print("🌐 [Tasks][Overdue] Error loading overdue tasks: \(error.localizedDescription)")
+                throw error
+            }
         } catch {
-            print("🌐 [Tasks] Error loading overdue tasks: \(error.localizedDescription)")
+            print("🌐 [Tasks][Overdue] Error loading overdue tasks: \(error.localizedDescription)")
             
             // Switch to offline mode if we have cached data
             if !self.offlineOverdueTasksCache.isEmpty {
-                print("🌐 [Tasks] Switching to offline mode with \(self.offlineOverdueTasksCache.count) cached overdue tasks")
+                print("🌐 [Tasks][Overdue] Switching to offline mode with \(self.offlineOverdueTasksCache.count) cached overdue tasks")
                 self.isOfflineMode = true
                 overdueTasks = self.offlineOverdueTasksCache
             } else {
                 // No cached data available, propagate the error
                 if let apiError = error as? APIError {
                     switch apiError {
+                    case .unauthorized, .authenticationFailed:
+                        await MainActor.run {
+                            authViewModel?.requiresLogin = true
+                        }
+                        print("🌐 [Tasks][Overdue] Unauthorized: triggering login modal.")
                     case .decodingError(let decodingError):
-                        print("🌐 [Tasks] Overdue decoding error details: \(decodingError)")
+                        print("🌐 [Tasks][Overdue] Decoding error details: \(decodingError)")
+                        if let decodingError = decodingError as? DecodingError {
+                            print("🌐 [Tasks][Overdue] DecodingError: \(decodingError)")
+                        }
                     case .clientError(let code, let message):
-                        print("🌐 [Tasks] Overdue client error (\(code)): \(message)")
+                        print("🌐 [Tasks][Overdue] Client error (\(code)): \(message)")
                     case .serverError(let code, let message):
-                        print("🌐 [Tasks] Overdue server error (\(code)): \(message)")
+                        print("🌐 [Tasks][Overdue] Server error (\(code)): \(message)")
                     default:
-                        print("🌐 [Tasks] Overdue API error: \(apiError.localizedDescription)")
+                        print("🌐 [Tasks][Overdue] API error: \(apiError.localizedDescription)")
                     }
+                }
+                if let urlError = error as? URLError {
+                    print("🌐 [Tasks][Overdue] URLError: \(urlError)")
                 }
                 throw error
             }
@@ -664,7 +623,7 @@ class TaskViewModel: ObservableObject {
                     do {
                         try await self.loadOverdueTasks()
                     } catch {
-                        print("🌐 [Tasks] Error in loadAllTasks (overdue): \(error.localizedDescription)")
+                        print("🌐 [Tasks][Overdue] Error in loadAllTasks (overdue): \(error.localizedDescription)")
                         throw error
                     }
                 }
@@ -678,27 +637,30 @@ class TaskViewModel: ObservableObject {
                 try await self.loadTasks(forToday: false)
             }
             print("🌐 [Tasks] Successfully loaded all tasks: \(tasks.count) today tasks, \(overdueTasks.count) overdue tasks")
-            
-            // Check if the specific task is in the loaded tasks
-            let specificTaskID = "91056be9-f329-4d22-8626-eef4a0f3b19d"
-            if tasks.contains(where: { $0.id == specificTaskID }) {
-                print("🌐 [Tasks] Specific task found in tasks array after loadAllTasks")
-            } else {
-                print("🌐 [Tasks] Specific task NOT found in tasks array after loadAllTasks")
-            }
         } catch {
-            print("🌐 [Tasks] Error loading all tasks: \(error.localizedDescription)")
+            print("🌐 [Tasks][All] Error loading all tasks: \(error.localizedDescription)")
             if let apiError = error as? APIError {
                 switch apiError {
+                case .unauthorized, .authenticationFailed:
+                    await MainActor.run {
+                        authViewModel?.requiresLogin = true
+                    }
+                    print("🌐 [Tasks][All] Unauthorized: triggering login modal.")
                 case .decodingError(let decodingError):
-                    print("🌐 [Tasks] All tasks decoding error details: \(decodingError)")
+                    print("🌐 [Tasks][All] Decoding error details: \(decodingError)")
+                    if let decodingError = decodingError as? DecodingError {
+                        print("🌐 [Tasks][All] DecodingError: \(decodingError)")
+                    }
                 case .clientError(let code, let message):
-                    print("🌐 [Tasks] All tasks client error (\(code)): \(message)")
+                    print("🌐 [Tasks][All] Client error (\(code)): \(message)")
                 case .serverError(let code, let message):
-                    print("🌐 [Tasks] All tasks server error (\(code)): \(message)")
+                    print("🌐 [Tasks][All] Server error (\(code)): \(message)")
                 default:
-                    print("🌐 [Tasks] All tasks API error: \(apiError.localizedDescription)")
+                    print("🌐 [Tasks][All] API error: \(apiError.localizedDescription)")
                 }
+            }
+            if let urlError = error as? URLError {
+                print("🌐 [Tasks][All] URLError: \(urlError)")
             }
             throw error
         }
@@ -793,4 +755,16 @@ class TaskViewModel: ObservableObject {
             print("[TaskViewModel] Error loading tasks after login: \(error)")
         }
     }
-} 
+    
+    // Add status code and body logging to all API calls
+    func logAPIResponse(_ response: URLResponse?, _ data: Data?) {
+        if let httpResponse = response as? HTTPURLResponse {
+            print("🌐 [Tasks][DEBUG] Status code: \(httpResponse.statusCode)")
+        } else {
+            print("🌐 [Tasks][DEBUG] No HTTPURLResponse")
+        }
+        if let data = data, let responseString = String(data: data, encoding: .utf8) {
+            print("🌐 [Tasks][DEBUG] Response body: \(responseString)")
+        }
+    }
+}
