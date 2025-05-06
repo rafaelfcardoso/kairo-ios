@@ -31,7 +31,7 @@ The Kairo system is organized around a clean separation of concerns between the 
 
 ### Diagram
 
-![Architecture Diagram](A_diagram_titled_"Architecture"_at_the_top_display.png)
+![Architecture Diagram](arquitecture.png)
 
 ### Components
 
