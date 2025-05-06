@@ -213,8 +213,10 @@ struct SidebarMenu: View {
                             }
                         }
                     }
-                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
                 }
+                .frame(maxWidth: .infinity)
                 
                 Spacer()
                 
@@ -256,7 +258,7 @@ struct SidebarMenu: View {
                     .padding(.bottom, 24)
                 }
             }
-            .frame(width: min(geometry.size.width * 0.85, 350))
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(backgroundColor)
             .ignoresSafeArea()
         }
