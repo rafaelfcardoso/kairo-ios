@@ -13,6 +13,8 @@ struct AppMainView: View {
     @Binding var selectedTab: Tab
     @Binding var isAuthenticated: Bool
     @State private var activeChatSession: ChatSession? = nil
+    @State private var showingNewChatOverlay: Bool = false
+    @StateObject private var newChatViewModel = GlobalChatViewModel()
     @StateObject private var authViewModel = AuthViewModel()
     
     var body: some View {
@@ -29,20 +31,27 @@ struct AppMainView: View {
                     // Sidebar: absolutely positioned, always at the left edge when open
                     if showingSidebar {
                         SidebarMenu(
-                            taskViewModel: taskViewModel,
-                            isShowingSidebar: $showingSidebar,
-                            selectedProject: $selectedProject,
-                            chatSessionsViewModel: chatSessionsViewModel,
-                            onSelectChatSession: { session in
-                                activeChatSession = session
-                                selectedTab = .today
-                            }
-                        )
-                        .environmentObject(projectViewModel)
+    taskViewModel: taskViewModel,
+    isShowingSidebar: $showingSidebar,
+    selectedProject: $selectedProject,
+    chatSessionsViewModel: chatSessionsViewModel,
+    onSelectChatSession: { session in
+        activeChatSession = session
+    },
+    onNewChat: {
+        showingNewChatOverlay = true
+        newChatViewModel.inputText = ""
+    }
+)
+.environmentObject(projectViewModel)
+.frame(width: min(geometry.size.width * 0.8, 320))
+.ignoresSafeArea(.container, edges: .vertical)
+.transition(.move(edge: .leading))
+.zIndex(4)
                         .frame(width: min(geometry.size.width * 0.8, 320))
                         .ignoresSafeArea(.container, edges: .vertical)
                         .transition(.move(edge: .leading))
-                        .zIndex(2)
+                        .zIndex(4)
                     }
 
                     // Main content (offset right when sidebar is open)
@@ -90,12 +99,30 @@ struct AppMainView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .animation(.easeInOut, value: showingSidebar)
 
-                // Chat screen as first-class screen (not overlay)
+                // New Chat Overlay (ChatGPT-style)
+                if showingNewChatOverlay {
+                    NewChatScreen(showingSidebar: $showingSidebar, showingNewChatOverlay: $showingNewChatOverlay, chatViewModel: newChatViewModel)
+                        .background(
+                            Color(.systemBackground)
+                                .opacity(0.98)
+                                .ignoresSafeArea()
+                        )
+                        .transition(.move(edge: .trailing))
+                        .zIndex(3)
+                        .allowsHitTesting(!showingSidebar)
+                }
+
+                // Chat overlay as a seamless ZStack layer
                 if let session = activeChatSession {
-                    NavigationStack {
-                        ChatScreen(sessionsViewModel: chatSessionsViewModel)
-                    }
-                    .zIndex(3)
+                    ChatScreen(sessionsViewModel: chatSessionsViewModel, showingSidebar: $showingSidebar)
+                        .background(
+                            Color(.systemBackground)
+                                .opacity(0.98)
+                                .ignoresSafeArea()
+                        )
+                        .transition(.move(edge: .trailing))
+                        .zIndex(2)
+                        .allowsHitTesting(!showingSidebar)
                 }
 
                 // Global Chat Input (always at the bottom, slides in/out with main view)

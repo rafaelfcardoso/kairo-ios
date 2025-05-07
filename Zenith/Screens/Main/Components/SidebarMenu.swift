@@ -12,6 +12,7 @@ struct SidebarMenu: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @ObservedObject var chatSessionsViewModel: ChatSessionsViewModel
     var onSelectChatSession: ((ChatSession) -> Void)?
+    var onNewChat: (() -> Void)?
     
     // Theme colors
     var backgroundColor: Color {
@@ -67,11 +68,8 @@ struct SidebarMenu: View {
                     .cornerRadius(10)
                     // No .padding(.horizontal) here, keep tight for row
                     Button(action: {
-                        // Start new chat session and open overlay
-                        chatSessionsViewModel.startNewSession()
-                        if let session = chatSessionsViewModel.currentSession {
-                            onSelectChatSession?(session)
-                        }
+                        // Open new chat overlay (ChatGPT style)
+                        onNewChat?()
                         withAnimation { isShowingSidebar = false }
                     }) {
                         Image(systemName: "square.and.pencil")
@@ -278,15 +276,17 @@ struct SidebarMenu: View {
             })
         }
         .onAppear {
+            print("[SidebarMenu] Sidebar appeared, isShowingSidebar = \(isShowingSidebar)")
             // Load projects when sidebar appears, but use caching
             loadProjects(forceRefresh: false)
         }
         .onChange(of: isShowingSidebar) { _, newValue in
+            print("[SidebarMenu] isShowingSidebar changed to", newValue)
             // When sidebar is shown, ensure projects are loaded
             if newValue {
                 loadProjects(forceRefresh: false)
-            }
-        }
+    }
+}
         .onPreferenceChange(SafeAreaInsetKey.self) { insets in
             statusBarHeight = insets.top
         }

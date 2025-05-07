@@ -10,13 +10,16 @@ class GlobalChatViewModel: ObservableObject {
     @Published var isExpanded: Bool = false
     @Published var isProcessing: Bool = false
     @Published var animationPhase: Int = 0
+    @Published var messages: [ChatMessage] = []
     
-    // Add any additional logic or dependencies you need here
-    // For now, this is a minimal real implementation
+    func sendMessage(_ text: String) {
+        let message = ChatMessage(text: text, isUser: true)
+        messages.append(message)
+        inputText = ""
+    }
     
     func submitText() {
-        // Add your send/submit logic here
-        inputText = ""
+        sendMessage(inputText)
     }
     
     func startRecording() {

@@ -88,16 +88,23 @@ struct InboxView: View {
                 }
             }
         }
-        .navigationTitle("Entrada")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingCreateTask = true
-                } label: {
-                    Image(systemName: "plus")
-                        .foregroundColor(textColor)
-                }
+            ToolbarItem(placement: .principal) {
+                UnifiedToolbar(
+                    title: "Entrada",
+                    subtitle: DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .none),
+                    onSidebarTap: {}, // Optionally inject sidebar action if needed
+                    trailing: AnyView(
+                        Button(action: { showingCreateTask = true }) {
+                            Image(systemName: "plus")
+                                .font(.title3)
+                                .foregroundColor(textColor)
+                        }
+                    ),
+                    textColor: colorScheme == .dark ? .white : .black,
+                    backgroundColor: colorScheme == .dark ? .black : .white
+                )
             }
         }
         .sheet(isPresented: $showingCreateTask) {

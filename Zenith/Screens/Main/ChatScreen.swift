@@ -2,26 +2,32 @@ import SwiftUI
 
 struct ChatScreen: View {
     @ObservedObject var sessionsViewModel: ChatSessionsViewModel
+    @Binding var showingSidebar: Bool
+    @Environment(\.colorScheme) var colorScheme
     @State private var inputText: String = ""
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header with session title and date
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(sessionsViewModel.currentSession?.title ?? "New Chat")
-                        .font(.headline)
+            UnifiedToolbar(
+                title: sessionsViewModel.currentSession?.title ?? "Novo Chat",
+                subtitle: {
                     if let date = sessionsViewModel.currentSession?.createdAt {
-                        Text(date, style: .date)
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                        return DateFormatter.localizedString(from: date, dateStyle: .medium, timeStyle: .none)
+                    } else {
+                        return nil
                     }
-                }
-                Spacer()
-            }
-            .padding()
-            .background(Color(.systemGray6))
-            
+                }(),
+                onSidebarTap: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showingSidebar = true
+                        HapticManager.shared.impact(style: .medium)
+                    }
+                },
+                trailing: nil,
+                textColor: colorScheme == .dark ? .white : .black,
+                backgroundColor: colorScheme == .dark ? .black : .white
+            )
+            .background((colorScheme == .dark ? Color.black : Color.white).ignoresSafeArea(edges: .top))
             Divider()
             
             // Chat messages
@@ -43,7 +49,7 @@ struct ChatScreen: View {
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
                 }
-                .onChange(of: sessionsViewModel.currentSession?.messages.count) { _ in
+                .onChange(of: sessionsViewModel.currentSession?.messages.count) { _, _ in
                     if let last = sessionsViewModel.currentSession?.messages.last?.id {
                         withAnimation { proxy.scrollTo(last, anchor: .bottom) }
                     }
@@ -53,23 +59,16 @@ struct ChatScreen: View {
             Divider()
             
             // Input bar
-            HStack {
-                TextField("Ask anything...", text: $inputText)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                Button(action: sendMessage) {
-                    Image(systemName: "paperplane.fill")
-                        .foregroundColor(inputText.isEmpty ? .gray : .blue)
-                }
-                .disabled(inputText.isEmpty)
-            }
-            .padding()
+            ChatInputField(text: $inputText, onSend: sendMessage)
+                .padding(.bottom, 4)
+
         }
-        .navigationBarTitleDisplayMode(.inline)
+
     }
     
     private func sendMessage() {
         guard !inputText.trimmingCharacters(in: .whitespaces).isEmpty,
-              let current = sessionsViewModel.currentSession else { return }
+              sessionsViewModel.currentSession != nil else { return }
         let message = ChatMessage(text: inputText, isUser: true)
         sessionsViewModel.appendMessage(message)
         inputText = ""

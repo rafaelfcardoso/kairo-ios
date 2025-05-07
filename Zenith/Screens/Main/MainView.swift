@@ -120,10 +120,30 @@ struct MainView: View {
     }
     
     var body: some View {
-        ZStack {
-            NavigationStack(path: $navigationPath) {
-                // Main content only; chat overlay is now global at app level
-                VStack {
+        NavigationStack(path: $navigationPath) {
+                VStack(spacing: 0) {
+                    UnifiedToolbar(
+                        title: viewModel.greeting,
+                        subtitle: viewModel.formattedDate,
+                        onSidebarTap: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showingSidebar = true
+                                HapticManager.shared.impact(style: .medium)
+                            }
+                        },
+                        trailing: AnyView(
+                            Button(action: { showingCreateTask = true }) {
+                                Image(systemName: "plus")
+                                    .font(.title3)
+                                    .foregroundColor(textColor)
+                            }
+                            .accessibilityLabel("Add task")
+                            .accessibilityIdentifier("add-task-button")
+                        ),
+                        textColor: colorScheme == .dark ? .white : .black,
+                        backgroundColor: colorScheme == .dark ? .black : .white
+                    )
+                    // Main content follows below
                     if viewModel.isLoading {
                         ProgressView()
                             .padding(.top, 100)
@@ -135,7 +155,6 @@ struct MainView: View {
                             onRetry: { Task { await performTaskLoad() } }
                         )
                     } else {
-                        if !displayedTasks.isEmpty {
                             TaskContentView(
                                 selectedProject: $selectedProject,
                                 selectedTab: $selectedTab,
@@ -146,28 +165,10 @@ struct MainView: View {
                                 displayedTasks: displayedTasks,
                                 onLoadTasks: { @Sendable in await self.performTaskLoad() }
                             )
-                        } else {
-                            // Optionally, show an empty state view here
-                            TaskContentView(
-                                selectedProject: $selectedProject,
-                                selectedTab: $selectedTab,
-                                viewModel: viewModel,
-                                showingCreateTask: $showingCreateTask,
-                                secondaryTextColor: secondaryTextColor,
-                                cardBackgroundColor: cardBackgroundColor,
-                                displayedTasks: displayedTasks,
-                                onLoadTasks: { @Sendable in await self.performTaskLoad() }
-                            )
-                        }
                     }
                 }
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) { sidebarButton }
-                    ToolbarItem(placement: .principal) { titleView }
-                    ToolbarItem(placement: .navigationBarTrailing) { addButton }
-                }
                 .task { await performTaskLoad() }
+        
                 .sheet(isPresented: $showingCreateTask) {
                     CreateTaskFormView(
                         viewModel: viewModel,
@@ -195,7 +196,7 @@ struct MainView: View {
             }
         }
     }
-}
+
 
 // MARK: - Toolbar Components
 private extension MainView {

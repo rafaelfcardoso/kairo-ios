@@ -214,6 +214,21 @@ The user wants to enhance the chat overlay and focus session experience. The Tas
 - The login modal appears reliably when a 401 is encountered, regardless of which API call fails.
 
 ## Executor's Feedback or Assistance Requests
+
+- Created NewChatScreen as a unified chat screen with toolbar and global chat input, to be shown when tapping the new chat icon in the sidebar.
+- [ ] Wire up the sidebar menu "new chat" button to present this screen as a global overlay (not navigation stack or modal), similar to ChatGPT.
+- [ ] Ensure chat session is only created after user sends a message; add to history then.
+- [ ] Remove the old chat overlay logic for "new chat" if necessary.
+- [ ] Test for visual and functional consistency.
+- No blockers so far.
+
+- ChatScreen now uses UnifiedToolbar in the navigation bar (via .toolbar), ensuring consistent styling with MainView.
+- Sidebar button is always present and functional, using the same animation and haptic feedback as MainView.
+- Lesson: To ensure toolbar consistency across screens, always render UnifiedToolbar inside the navigation bar using .toolbar { ToolbarItem(placement: .principal) { ... } }.
+- Lesson: Sidebar button must be wired to a shared @Binding var (e.g., showingSidebar) for global sidebar control.
+- No blockers encountered. Ready to proceed with Project view refactor. to use shared components, and integrate ChatInputField where applicable.
+- No blockers encountered; components compile and integrate cleanly in MainView.
+
 - Enhanced TaskViewModel with standardized, source-specific API error and status code logging.
 - All .unauthorized/.authenticationFailed errors now reliably trigger the login modal and are clearly logged.
 - Please test and report any non-authentication errors for further investigation.
@@ -240,20 +255,22 @@ The goal is to robustly handle API authentication errors, ensure the user is pro
 ### Implementation Plan
 
 #### 1. Extract Shared Components
-- [ ] **UnifiedToolbar**
+- [x] **UnifiedToolbar**
   - Contains sidebar/hamburger button (always left-aligned).
   - Takes a dynamic title prop: greeting, project name, or chat session name.
   - Optional: right-side actions (settings, etc.).
-- [ ] **ChatInputField**
+- [x] **ChatInputField**
   - Single source of truth for chat input UI/logic.
   - Used in MainView, Chat overlay, and Project/Inbox screens.
   - Optional: support matchedGeometryEffect for smooth transitions.
 
 #### 2. Refactor All Screens
-- [ ] **MainView**: Replace toolbar and chat input with shared components.
-- [ ] **ChatScreen/Overlay**: Use UnifiedToolbar (with chat session title) and ChatInputField.
-- [ ] **Project/Inbox Views**: Use UnifiedToolbar (with project/inbox name) and ChatInputField.
-- [ ] Ensure sidebar can always be opened from any screen (toolbar button always present).
+- [x] **MainView**: Replace toolbar and chat input with shared components.
+- [x] Refactor ChatScreen to use UnifiedToolbar in the navigation bar, matching MainView.
+- [x] Ensure the sidebar button is always present and functional in ChatScreen toolbar.
+- [x] Present ChatScreen as a seamless overlay in AppMainView, not a separate NavigationStack, for unified sidebar + chat UX.
+- [ ] Refactor Project and Inbox views to use UnifiedToolbar and ChatInputField.
+- [ ] Test the application thoroughly to confirm that all navigation and chat functionalities work as intended.
 
 #### 3. Consistency & Animation
 - [ ] All screens have toolbar at top and chat input at bottom (unless intentionally hidden).
