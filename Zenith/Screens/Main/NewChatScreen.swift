@@ -1,5 +1,5 @@
 import SwiftUI
-// If needed, import the shared ChatMessage model location here
+
 
 struct NewChatScreen: View {
     @Binding var showingSidebar: Bool
@@ -7,24 +7,25 @@ struct NewChatScreen: View {
     @ObservedObject var chatViewModel: GlobalChatViewModel
     @Environment(\.colorScheme) var colorScheme
     
+    @StateObject private var keyboardHandler = KeyboardHeightHandler()
     var body: some View {
         VStack(spacing: 0) {
             UnifiedToolbar(
-    title: "Novo Chat",
-    subtitle: nil,
-    onSidebarTap: {
-        print("[NewChatScreen] Hamburger tapped, setting showingSidebar = true and dismissing overlay")
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            showingSidebar = true
-            showingNewChatOverlay = false
-            HapticManager.shared.impact(style: .medium)
-        }
-    },
-    trailing: nil,
-    textColor: colorScheme == .dark ? .white : .black,
-    backgroundColor: colorScheme == .dark ? .black : .white,
-    showDivider: true
-)
+                title: "Novo Chat",
+                subtitle: nil,
+                onSidebarTap: {
+                    print("[NewChatScreen] Hamburger tapped, setting showingSidebar = true and dismissing overlay")
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showingSidebar = true
+                        showingNewChatOverlay = false
+                        HapticManager.shared.impact(style: .medium)
+                    }
+                },
+                trailing: nil,
+                textColor: colorScheme == .dark ? .white : .black,
+                backgroundColor: colorScheme == .dark ? .black : .white,
+                showDivider: true
+            )
             
             // Chat messages
             ScrollViewReader { proxy in
@@ -46,17 +47,18 @@ struct NewChatScreen: View {
                     .padding(.horizontal, 12)
                 }
                 .onChange(of: chatViewModel.messages.count) { _, _ in
-    if let last = chatViewModel.messages.last?.id {
-        withAnimation { proxy.scrollTo(last, anchor: .bottom) }
-    }
-}
+                    if let last = chatViewModel.messages.last?.id {
+                        withAnimation { proxy.scrollTo(last, anchor: .bottom) }
+                    }
+                }
             }
             Divider()
             GlobalChatInput(viewModel: chatViewModel)
-                .padding(.bottom, 4)
-                .padding(.bottom, (UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first?.safeAreaInsets.bottom ?? 0))
+                .padding(.bottom, max(keyboardHandler.keyboardHeight, UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first?.safeAreaInsets.bottom ?? 0))
+                .animation(.easeOut(duration: 0.25), value: keyboardHandler.keyboardHeight)
                 .ignoresSafeArea(.keyboard, edges: .bottom)
         }
+        .dismissKeyboardOnTap()
     }
 }
 

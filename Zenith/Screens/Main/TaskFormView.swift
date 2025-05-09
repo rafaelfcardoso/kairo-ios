@@ -812,6 +812,7 @@ struct TaskFormView: View {
             }
         }
         .background(backgroundColor)
+        
     }
     
     @ViewBuilder

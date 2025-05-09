@@ -43,5 +43,7 @@ struct TaskListView: View {
                 }
             }
         }
+        .dismissKeyboardOnTap()
+        
     }
 } 

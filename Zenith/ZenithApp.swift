@@ -44,59 +44,6 @@ import AVFoundation
     }
 }
 
-// MARK: - Keyboard Height Handler
-class KeyboardHeightHandler: ObservableObject {
-    @Published var keyboardHeight: CGFloat = 0 {
-        didSet {
-            print("[KeyboardHeightHandler] keyboardHeight updated: \(keyboardHeight)")
-        }
-    }
-    @Published var animationDuration: Double = 0.25
-    
-    init() {
-        // Register for keyboard notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(keyboardWillShow),
-            name: UIResponder.keyboardWillShowNotification,
-            object: nil
-        )
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(keyboardWillHide),
-            name: UIResponder.keyboardWillHideNotification,
-            object: nil
-        )
-    }
-    
-    deinit {
-        NotificationCenter.default.removeObserver(self)
-    }
-    
-    @objc private func keyboardWillShow(_ notification: Notification) {
-        if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
-           let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double {
-            
-            // Ensure UI updates happen on the main thread with high priority
-            DispatchQueue.main.async {
-                // Add 1 point to avoid tiny gap
-                self.keyboardHeight = keyboardFrame.height + 1
-                self.animationDuration = duration
-            }
-        }
-    }
-    
-    @objc private func keyboardWillHide(_ notification: Notification) {
-        if let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double {
-            // Ensure UI updates happen on the main thread with high priority
-            DispatchQueue.main.async {
-                self.keyboardHeight = 0
-                self.animationDuration = duration
-            }
-        }
-    }
-}
 
 // MARK: - Haptic Feedback
 class HapticManager {

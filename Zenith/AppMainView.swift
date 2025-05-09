@@ -5,7 +5,7 @@ struct AppMainView: View {
     @ObservedObject var taskViewModel: TaskViewModel
     @ObservedObject var focusViewModel: FocusSessionViewModel
     @ObservedObject var projectViewModel: ProjectViewModel
-    @ObservedObject var keyboardHandler: KeyboardHeightHandler
+    @StateObject var keyboardHandler = KeyboardHeightHandler()
     @ObservedObject var chatViewModel: GlobalChatViewModel
     @StateObject var chatSessionsViewModel = ChatSessionsViewModel()
     @Binding var showingSidebar: Bool
@@ -20,34 +20,24 @@ struct AppMainView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
-                // Tap to dismiss keyboard
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { hideKeyboard() }
-                    .ignoresSafeArea()
-
                 // --- SIDEBAR + MAIN CONTENT LAYOUT (robust, fixed sidebar) ---
                 ZStack(alignment: .leading) {
                     // Sidebar: absolutely positioned, always at the left edge when open
                     if showingSidebar {
                         SidebarMenu(
-    taskViewModel: taskViewModel,
-    isShowingSidebar: $showingSidebar,
-    selectedProject: $selectedProject,
-    chatSessionsViewModel: chatSessionsViewModel,
-    onSelectChatSession: { session in
-        activeChatSession = session
-    },
-    onNewChat: {
-        showingNewChatOverlay = true
-        newChatViewModel.inputText = ""
-    }
-)
-.environmentObject(projectViewModel)
-.frame(width: min(geometry.size.width * 0.8, 320))
-.ignoresSafeArea(.container, edges: .vertical)
-.transition(.move(edge: .leading))
-.zIndex(4)
+                            taskViewModel: taskViewModel,
+                            isShowingSidebar: $showingSidebar,
+                            selectedProject: $selectedProject,
+                            chatSessionsViewModel: chatSessionsViewModel,
+                            onSelectChatSession: { session in
+                                activeChatSession = session
+                            },
+                            onNewChat: {
+                                showingNewChatOverlay = true
+                                newChatViewModel.inputText = ""
+                            }
+                        )
+                        .environmentObject(projectViewModel)
                         .frame(width: min(geometry.size.width * 0.8, 320))
                         .ignoresSafeArea(.container, edges: .vertical)
                         .transition(.move(edge: .leading))
@@ -142,6 +132,7 @@ struct AppMainView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea(edges: .bottom)
             // --- AUTH MODAL ---
+
             .fullScreenCover(isPresented: $authViewModel.requiresLogin, content: {
                 LoginView()
                     .environmentObject(authViewModel)
@@ -153,9 +144,5 @@ struct AppMainView: View {
                 isAuthenticated = false
             }
         }
-    }
-
-    private func hideKeyboard() {
-        // Removed UIApplication.endEditing call
     }
 }

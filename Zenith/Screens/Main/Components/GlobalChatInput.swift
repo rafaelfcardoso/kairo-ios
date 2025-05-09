@@ -182,14 +182,16 @@ struct GlobalChatInput: View {
         .padding(.vertical, 8)
         .background(containerBackgroundColor)
         .clipShape(RoundedCorners(tl: 20, tr: 20, bl: 0, br: 0))
-        .onTapGesture {
-            // Ensure we're on the main thread and prioritize this action
-            DispatchQueue.main.async {
-                if !isFocused {
-                    isFocused = true
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                DispatchQueue.main.async {
+                    if !isFocused {
+                        isFocused = true
+                    }
                 }
             }
-        }
+        )
+        .background(Color.blue.opacity(0.3))
     }
     
     // Function to dismiss keyboard that can be called from outside

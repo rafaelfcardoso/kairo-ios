@@ -19,7 +19,23 @@ class GlobalChatViewModel: ObservableObject {
     }
     
     func submitText() {
-        sendMessage(inputText)
+        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        sendMessage(text)
+        isProcessing = true
+        ClaudeLLMService.shared.sendMessage(text) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.isProcessing = false
+                switch result {
+                case .success(let reply):
+                    let assistantMessage = ChatMessage(text: reply, isUser: false)
+                    self?.messages.append(assistantMessage)
+                case .failure(let error):
+                    let errorMessage = ChatMessage(text: "[Erro: \(error.localizedDescription)]", isUser: false)
+                    self?.messages.append(errorMessage)
+                }
+            }
+        }
     }
     
     func startRecording() {

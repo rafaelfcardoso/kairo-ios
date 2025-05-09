@@ -194,8 +194,12 @@ struct MainView: View {
                     viewModel.refreshAfterLogin()
                 }
             }
+            .background(Color.purple.opacity(0.3))
+            
         }
     }
+    
+    
 
 
 // MARK: - Toolbar Components
