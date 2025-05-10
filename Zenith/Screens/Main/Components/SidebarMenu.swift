@@ -118,29 +118,32 @@ struct SidebarMenu: View {
                             }
                         }
                         
-                        // Chat Section
-                        HStack {
-                            Text("CHAT")
-                                .font(.footnote)
-                                .fontWeight(.semibold)
-                                .foregroundColor(secondaryTextColor)
-                            Spacer()
+                        // Previous Chats Section (only if there are previous chats)
+                let previousChats = chatSessionsViewModel.sessions.filter { !$0.messages.isEmpty }
+                if !previousChats.isEmpty {
+                    HStack {
+                        Text("Previous Chats")
+                            .font(.footnote)
+                            .fontWeight(.semibold)
+                            .foregroundColor(secondaryTextColor)
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 16)
+                    
+                    ForEach(previousChats) { session in
+                        menuItem(
+                            icon: "bubble.left.and.bubble.right.fill",
+                            title: session.title.isEmpty ? "Chat em branco" : session.title,
+                            count: session.messages.count,
+                            isSelected: chatSessionsViewModel.currentSession?.id == session.id
+                        ) {
+                            chatSessionsViewModel.selectSession(session)
+                            onSelectChatSession?(session)
+                            withAnimation { isShowingSidebar = false }
                         }
-                        .padding(.horizontal)
-                        .padding(.top, 16)
-                        
-                        ForEach(chatSessionsViewModel.sessions) { session in
-                            menuItem(
-                                icon: "bubble.left.and.bubble.right.fill",
-                                title: session.title.isEmpty ? "Chat em branco" : session.title,
-                                count: session.messages.count,
-                                isSelected: chatSessionsViewModel.currentSession?.id == session.id
-                            ) {
-                                chatSessionsViewModel.selectSession(session)
-                                onSelectChatSession?(session)
-                                withAnimation { isShowingSidebar = false }
-                            }
-                        }
+                    }
+                }
                         
                         // Projects section header
                         HStack {

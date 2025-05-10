@@ -195,6 +195,7 @@ struct CustomTabBar: View {
 // MARK: - Main App
 @main
 struct ZenithApp: App {
+    @StateObject private var chatSessionsViewModel = ChatSessionsViewModel()
     @State private var isAuthenticated: Bool
     @StateObject private var authViewModel = AuthViewModel()
     init() {
@@ -205,7 +206,11 @@ struct ZenithApp: App {
 #endif
         // Initialize AFTER clearing token
         _isAuthenticated = State(initialValue: APIConfig.authToken != nil)
-        _chatViewModel = StateObject(wrappedValue: GlobalChatViewModel())
+        let chatSessionsVM = ChatSessionsViewModel()
+        let chatVM = GlobalChatViewModel()
+        chatVM.chatSessionsViewModel = chatSessionsVM
+        _chatSessionsViewModel = StateObject(wrappedValue: chatSessionsVM)
+        _chatViewModel = StateObject(wrappedValue: chatVM)
     }
     @StateObject private var taskViewModel = TaskViewModel()
     @StateObject private var focusViewModel = FocusSessionViewModel()

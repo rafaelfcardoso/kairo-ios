@@ -23,12 +23,14 @@ struct RoundedCorners: Shape {
 
 struct GlobalChatInput: View {
     @ObservedObject var viewModel: GlobalChatViewModel
+    var onSend: ((String) -> Void)? = nil
     @Environment(\.colorScheme) private var colorScheme
     @FocusState private var isFocused: Bool
     
     // Initialize with TaskViewModel for natural language processing
-    init(viewModel: GlobalChatViewModel) {
+    init(viewModel: GlobalChatViewModel, onSend: ((String) -> Void)? = nil) {
         self.viewModel = viewModel
+        self.onSend = onSend
     }
     
     private var pillBackgroundColor: Color {
@@ -116,7 +118,16 @@ struct GlobalChatInput: View {
                                 }
                                 .submitLabel(.send) // Use send button on keyboard
                                 .onSubmit {
-                                    viewModel.submitText()
+                                    let text = viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    guard !text.isEmpty else { return }
+                                    print("[GlobalChatInput] onSubmit with text: \(text)")
+                                    if let onSend = onSend {
+                                        onSend(text)
+                                        viewModel.inputText = ""
+                                    } else {
+                                        print("[GlobalChatInput] onSubmit fallback to viewModel.submitText()")
+                                        viewModel.submitText()
+                                    }
                                 }
                                 // Add this to improve keyboard responsiveness
                                 .autocorrectionDisabled(true)
@@ -133,7 +144,17 @@ struct GlobalChatInput: View {
                             // Do nothing while processing
                             return
                         } else if !viewModel.inputText.isEmpty {
-                            viewModel.submitText()
+                            let text = viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !text.isEmpty else { return }
+                            print("[GlobalChatInput] Send button tapped with text: \(text)")
+                            if let onSend = onSend {
+                                onSend(text)
+                                viewModel.inputText = ""
+                            } else {
+                                print("[GlobalChatInput] Send button fallback to viewModel.submitText()")
+                                viewModel.submitText()
+                            }
+                        
                         } else if viewModel.isRecording {
                             viewModel.stopRecording()
                         } else {
@@ -191,7 +212,6 @@ struct GlobalChatInput: View {
                 }
             }
         )
-        .background(Color.blue.opacity(0.3))
     }
     
     // Function to dismiss keyboard that can be called from outside

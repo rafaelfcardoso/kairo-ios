@@ -91,7 +91,7 @@ struct AppMainView: View {
 
                 // New Chat Overlay (ChatGPT-style)
                 if showingNewChatOverlay {
-                    NewChatScreen(showingSidebar: $showingSidebar, showingNewChatOverlay: $showingNewChatOverlay, chatViewModel: newChatViewModel)
+                    NewChatScreen(showingSidebar: $showingSidebar, showingNewChatOverlay: $showingNewChatOverlay, chatSessionsViewModel: chatSessionsViewModel, chatViewModel: newChatViewModel)
                         .background(
                             Color(.systemBackground)
                                 .opacity(0.98)
@@ -99,19 +99,6 @@ struct AppMainView: View {
                         )
                         .transition(.move(edge: .trailing))
                         .zIndex(3)
-                        .allowsHitTesting(!showingSidebar)
-                }
-
-                // Chat overlay as a seamless ZStack layer
-                if let session = activeChatSession {
-                    ChatScreen(sessionsViewModel: chatSessionsViewModel, showingSidebar: $showingSidebar)
-                        .background(
-                            Color(.systemBackground)
-                                .opacity(0.98)
-                                .ignoresSafeArea()
-                        )
-                        .transition(.move(edge: .trailing))
-                        .zIndex(2)
                         .allowsHitTesting(!showingSidebar)
                 }
 
@@ -139,6 +126,7 @@ struct AppMainView: View {
             })
         }
         .onAppear {
+            print("[AppMainView] chatSessionsViewModel: \(Unmanaged.passUnretained(chatSessionsViewModel).toOpaque())")
             print("[AppMainView] Rendered with GeometryReader-rooted overlay")
             NotificationCenter.default.addObserver(forName: .userDidLogout, object: nil, queue: .main) { _ in
                 isAuthenticated = false

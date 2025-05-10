@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+// import ChatSession model is not needed if it's in the same module or target
 
 class ChatSessionsViewModel: ObservableObject {
     @Published var sessions: [ChatSession] = []

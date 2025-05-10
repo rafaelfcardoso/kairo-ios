@@ -37,17 +37,20 @@ The app must show a login modal when an API call returns 401 Unauthorized. Curre
     - [x] Implement networking to send user chat messages to Claude.
     - [x] Receive and display LLM responses in the chat UI (console for now).
     - [x] Parse and handle tool call instructions (e.g., `create-task`).
-- [ ] **Integrate MCP client with chat-driven task creation flow:**
-      - [ ] Update `GlobalChatViewModel` to handle task creation intent.
-      - [ ] Ensure chat session starts when user wants to create a task.
-      - [ ] Use the LLM to call the MCP `create-task` tool via the repository/use case.
-      - [ ] Ensure only the Presentation layer interacts with the use case, not MCP directly.
-      - [ ] **Implement animated transitions and premium chat UX:**
-          - [ ] Design animated fade/slide transitions between Task List and Chat UI.
-          - [ ] Use shared element transitions (e.g., matchedGeometryEffect) for persistent UI components.
-          - [ ] Add visual feedback for assistant “thinking” (typing indicator, shimmer, etc).
-          - [ ] Animate chat message bubbles and input focus.
-          - [ ] Ensure accessibility (Reduce Motion) and performance best practices.
+- [ ] **Implement ChatGPT-style New Chat Flow (GlobalChatInput & NewChatScreen UI and logic):**
+    - [x] Update `GlobalChatViewModel` to support new chat session creation from the global chat input.
+    - [ ] On user prompt submission, create a new `ChatSession` and add the user's message.
+    - [ ] Transition UI to `NewChatScreen` with the new session active.
+    - [ ] Display user's message and AI response in the new session.
+    - [ ] Ensure session is added to chat history and accessible from sidebar.
+    - [ ] Animate the transition for a seamless experience.
+    - [ ] (Optional) Persist chat sessions locally.
+    - **Success Criteria:**
+        - User prompt in global input creates a new chat session.
+        - UI transitions to `NewChatScreen` with the session active.
+        - User and AI messages appear correctly.
+        - New session is tracked in chat history/sidebar.
+        - Visual and functional flow matches ChatGPT-style UX.
 - [ ] Test the chat-driven task creation end-to-end.
 - [ ] Document changes and update scratchpad/architecture docs as needed.
 - [ ] Create Repositories and UseCases with protocol-oriented abstractions (verify Presentation layer has no direct MCP imports).
@@ -77,24 +80,6 @@ The app must show a login modal when an API call returns 401 Unauthorized. Curre
 - [ ] Remove FocusSessionViewModel debug logs.
 - [ ] Refactor Focus Session modal logic in TaskFormView: use a @State var to control modal visibility and present FocusSessionView using .sheet or .fullScreenCover. Remove UIKit rootVC.present logic for SwiftUI-native modal presentation.
 - [ ] Fix: Focus session modal does not show when tapping "Iniciar Sessão de foco" (ensure state and sheet logic is correct and integrated with FocusSessionViewModel).
-
-## Project Status Board (Chat Overlay Refactor)
-- [x] Refactor chat overlay to be global (app-level only), removing from MainView and other views.
-- [ ] Remove the custom tab bar and all related logic from ZenithApp.swift and any other affected files.
-- [ ] Ensure chat overlay respects safe areas and does not cross navigation/tool bar boundaries (now simplified).
-- [ ] Test across all screens to confirm no duplication and correct overlay behavior.
-
-## Success Criteria (Chat Overlay Refactor)
-- Only one chat overlay/input is ever visible, regardless of screen.
-- Chat overlay never crosses navigation/tool bar boundaries (tab bar removed).
-- No duplicated chat messages or UI.
-- All existing chat and navigation functionality remains intact.
-
-## Planner Note (Tab Bar Removal)
-
-- User has decided the tab bar is unnecessary and can be safely removed from the app.
-- Dashboard remains deactivated.
-- This will simplify the layout and resolve chat overlay/safe area complexity.
 
 ## Planner Note: Local Chat Sessions & History (Pre-Backend)
 
@@ -142,12 +127,20 @@ The app must show a login modal when an API call returns 401 Unauthorized. Curre
 - Provide a way to exit/close chat overlay (e.g., X button or swipe down).
 
 ### Project Status Board (Chat Sessions & History)
-- [ ] Define `ChatSession` data model and `ChatSessionsViewModel`.
-- [ ] Integrate session management into chat overlay and sidebar.
-- [ ] Implement "New Chat" and session selection UX.
-- [ ] (Optional) Add local persistence for sessions.
-- [ ] Add UI affordance to exit/close chat overlay.
-- [ ] Test: create, switch, delete, and persist chat sessions.
+#### Phase 1: Essential Implementation
+- [x] Define `ChatSession` model and `ChatSessionsViewModel` with session management
+- [ ] Implement ChatGPT-style New Chat Flow (GlobalChatInput & NewChatScreen UI and logic)
+- [ ] Update `GlobalChatViewModel` to start and select a new chat session on send
+- [ ] Integrate session management into chat overlay and sidebar
+- [ ] Add basic XCUITest for chat send and keyboard dismissal
+- [ ] Add UI test to verify AI responses appear correctly in chat session UI
+- [ ] Add unit test for GlobalChatViewModel response-handling logic
+
+#### Phase 2: Premium Enhancements
+- [ ] Implement subtle transition from GlobalChatInput send to NewChatScreen overlay
+- [ ] Animate the overlay transition for a seamless UX
+- [ ] Add XCUITest for overlay transition and keyboard dismissal edge cases
+- [ ] Add local persistence for chat sessions (UserDefaults or local file)
 
 ### Success Criteria
 - User can start new chats, switch between past chats, and see chat history in the sidebar.
@@ -214,6 +207,8 @@ The user wants to enhance the chat overlay and focus session experience. The Tas
 - The login modal appears reliably when a 401 is encountered, regardless of which API call fails.
 
 ## Executor's Feedback or Assistance Requests
+
+- The GlobalChatViewModel has been refactored to support new chat session creation via the ChatSessionsViewModel. The next step is to ensure the UI (GlobalChatInput and navigation logic) triggers the transition to the NewChatScreen with the new session active.
 
 - Created NewChatScreen as a unified chat screen with toolbar and global chat input, to be shown when tapping the new chat icon in the sidebar.
 - [ ] Wire up the sidebar menu "new chat" button to present this screen as a global overlay (not navigation stack or modal), similar to ChatGPT.
