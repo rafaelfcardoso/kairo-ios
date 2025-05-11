@@ -25,6 +25,9 @@ struct UnifiedToolbar: View {
                     .foregroundColor(textColor)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    .id(title) // animate on title change
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.45), value: title)
                 if let subtitle = subtitle {
                     Text(subtitle)
                         .font(.subheadline)
@@ -45,4 +48,3 @@ struct UnifiedToolbar: View {
             .background(backgroundColor.ignoresSafeArea(edges: .top))
     }
 }
-

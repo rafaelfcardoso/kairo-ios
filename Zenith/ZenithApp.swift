@@ -230,6 +230,7 @@ struct ZenithApp: App {
                     taskViewModel: taskViewModel,
                     focusViewModel: focusViewModel,
                     projectViewModel: projectViewModel,
+                    chatSessionsViewModel: chatSessionsViewModel,
                     keyboardHandler: keyboardHandler,
                     chatViewModel: chatViewModel,
                     showingSidebar: $showingSidebar,

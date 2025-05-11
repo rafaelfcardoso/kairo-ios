@@ -118,33 +118,6 @@ struct SidebarMenu: View {
                             }
                         }
                         
-                        // Previous Chats Section (only if there are previous chats)
-                let previousChats = chatSessionsViewModel.sessions.filter { !$0.messages.isEmpty }
-                if !previousChats.isEmpty {
-                    HStack {
-                        Text("Previous Chats")
-                            .font(.footnote)
-                            .fontWeight(.semibold)
-                            .foregroundColor(secondaryTextColor)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 16)
-                    
-                    ForEach(previousChats) { session in
-                        menuItem(
-                            icon: "bubble.left.and.bubble.right.fill",
-                            title: session.title.isEmpty ? "Chat em branco" : session.title,
-                            count: session.messages.count,
-                            isSelected: chatSessionsViewModel.currentSession?.id == session.id
-                        ) {
-                            chatSessionsViewModel.selectSession(session)
-                            onSelectChatSession?(session)
-                            withAnimation { isShowingSidebar = false }
-                        }
-                    }
-                }
-                        
                         // Projects section header
                         HStack {
                             Text("PROJETOS")
@@ -216,15 +189,26 @@ struct SidebarMenu: View {
                                 }
                             }
                         }
+                        
+                        // Previous Chats should appear immediately after projects, with consistent padding
+                        PreviousChatsSection(
+                            previousChats: chatSessionsViewModel.sessions.filter { !$0.messages.isEmpty },
+                            currentSessionId: chatSessionsViewModel.currentSession?.id,
+                            onSelect: { session in
+                                chatSessionsViewModel.selectSession(session)
+                                onSelectChatSession?(session)
+                                withAnimation { isShowingSidebar = false }
+                            },
+                            secondaryTextColor: secondaryTextColor
+                        )
+                        .padding(.top, 12)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal)
                 }
-                .frame(maxWidth: .infinity)
                 
                 Spacer()
                 
-                // User profile and settings at the bottom
                 VStack(spacing: 0) {
                     // Divider before user section
                     Rectangle()
@@ -288,8 +272,8 @@ struct SidebarMenu: View {
             // When sidebar is shown, ensure projects are loaded
             if newValue {
                 loadProjects(forceRefresh: false)
-    }
-}
+            }
+        }
         .onPreferenceChange(SafeAreaInsetKey.self) { insets in
             statusBarHeight = insets.top
         }
@@ -344,17 +328,66 @@ struct SidebarMenu: View {
     }
 }
 
+// MARK: - PreviousChatsSection
+
+struct PreviousChatsSection: View {
+    let previousChats: [ChatSession]
+    let currentSessionId: UUID?
+    let onSelect: (ChatSession) -> Void
+    let secondaryTextColor: Color
+    
+    private func sessionTitle(_ session: ChatSession) -> String {
+        if !session.title.isEmpty { return session.title }
+        return session.messages.first(where: { $0.isUser })?.text.prefix(32).description ?? "Chat em branco"
+    }
+    
+    var body: some View {
+        if previousChats.isEmpty {
+            EmptyView()
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("Previous Chats")
+                        .font(.footnote)
+                        .fontWeight(.semibold)
+                        .foregroundColor(secondaryTextColor)
+                    Spacer()
+                }
+                .padding(.top, 16)
+                
+                ForEach(previousChats.filter { $0.title != "New Chat" }) { session in
+                    Button(action: { onSelect(session) }) {
+                        HStack {
+                            Text(sessionTitle(session))
+                                .font(.system(size: 16))
+                                .foregroundColor(currentSessionId == session.id ? AppTheme.shared.activeColor : .primary)
+                            Spacer()
+                            if session.messages.count > 0 {
+                                Text("\(session.messages.count)")
+                                    .font(.system(.subheadline, design: .rounded))
+                                    .foregroundColor(secondaryTextColor)
+                            }
+                        }
+                        .padding(.vertical, 12)
+                        .padding(.horizontal)
+                        .background(currentSessionId == session.id ? Color.gray.opacity(0.2) : Color.clear)
+                        .cornerRadius(8)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.45), value: session.title)
+                }
+            }
+        }
+    }
+}
+
 #Preview {
     ZStack {
         Color.gray.opacity(0.3).edgesIgnoringSafeArea(.all)
-        
         SidebarMenu(taskViewModel: TaskViewModel(), isShowingSidebar: .constant(true), selectedProject: .constant(nil), chatSessionsViewModel: ChatSessionsViewModel())
             .environmentObject(ProjectViewModel())
             .environmentObject(AuthViewModel())
     }
-}
-
-import Foundation
-extension Notification.Name {
-    static let userDidLogout = Notification.Name("userDidLogout")
 }

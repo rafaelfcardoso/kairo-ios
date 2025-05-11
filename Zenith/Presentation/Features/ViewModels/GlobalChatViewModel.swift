@@ -10,7 +10,7 @@ class GlobalChatViewModel: ObservableObject {
     @Published var isExpanded: Bool = false
     @Published var isProcessing: Bool = false
     @Published var animationPhase: Int = 0
-    // Remove local messages: chat sessions are now managed by ChatSessionsViewModel
+    @Published var shouldPresentNewChatOverlay: Bool = false
     
     // Reference to the sessions view model (should be injected from parent/app coordinator)
     var chatSessionsViewModel: ChatSessionsViewModel?
@@ -31,22 +31,44 @@ class GlobalChatViewModel: ObservableObject {
         // Send prompt to LLM and append AI response to session
         isProcessing = true
         ClaudeLLMService.shared.sendMessage(prompt) { [weak self, weak sessionsVM] result in
-            DispatchQueue.main.async {
-                self?.isProcessing = false
-                if let idx = sessionsVM?.sessions.firstIndex(where: { $0.id == session.id }) {
-                    switch result {
-                    case .success(let reply):
-                        let assistantMessage = ChatMessage(text: reply, isUser: false)
-                        sessionsVM?.sessions[idx].messages.append(assistantMessage)
-                        sessionsVM?.currentSession = sessionsVM?.sessions[idx]
-                    case .failure(let error):
-                        let errorMessage = ChatMessage(text: "[Erro: \(error.localizedDescription)]", isUser: false)
-                        sessionsVM?.sessions[idx].messages.append(errorMessage)
-                        sessionsVM?.currentSession = sessionsVM?.sessions[idx]
+    DispatchQueue.main.async {
+        self?.isProcessing = false
+        guard let sessionsVM = sessionsVM else { return }
+        if let idx = sessionsVM.sessions.firstIndex(where: { $0.id == session.id }) {
+            switch result {
+            case .success(let reply):
+                let assistantMessage = ChatMessage(text: reply, isUser: false)
+                sessionsVM.sessions[idx].messages.append(assistantMessage)
+                sessionsVM.currentSession = sessionsVM.sessions[idx]
+                print("[Chat] Claude reply appended. Will now generate session title...")
+                // Prepare ClaudeMessage array from session messages
+                let messagesForTitle = sessionsVM.sessions[idx].messages.map { msg in
+                    ClaudeMessage(role: msg.isUser ? "user" : "assistant", content: msg.text)
+                }
+                ClaudeLLMService.shared.generateTitleForChatSession(messages: messagesForTitle) { titleResult in
+                    DispatchQueue.main.async {
+                        switch titleResult {
+                        case .success(let title):
+                            let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                            print("[Chat] Claude generated session title: \(trimmed)")
+                            // Update session title in sessions array and currentSession
+                            if let idx2 = sessionsVM.sessions.firstIndex(where: { $0.id == session.id }) {
+                                sessionsVM.sessions[idx2].title = trimmed.isEmpty ? "New Chat" : trimmed
+                                sessionsVM.currentSession = sessionsVM.sessions[idx2]
+                            }
+                        case .failure(let error):
+                            print("[Chat] Failed to generate session title: \(error.localizedDescription)")
+                        }
                     }
                 }
+            case .failure(let error):
+                let errorMessage = ChatMessage(text: "[Erro: \(error.localizedDescription)]", isUser: false)
+                sessionsVM.sessions[idx].messages.append(errorMessage)
+                sessionsVM.currentSession = sessionsVM.sessions[idx]
             }
         }
+    }
+}
     }
 
     /// Called when the user presses send/submit in the global chat input
@@ -54,6 +76,7 @@ class GlobalChatViewModel: ObservableObject {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         startNewChatSession(with: text)
+        shouldPresentNewChatOverlay = true
     }
     
     /// Appends a message to the current session and sends it to the LLM (for use in NewChatScreen)

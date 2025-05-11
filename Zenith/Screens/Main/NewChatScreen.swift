@@ -11,7 +11,8 @@ struct NewChatScreen: View {
     var body: some View {
         VStack(spacing: 0) {
             UnifiedToolbar(
-                title: "Novo Chat",
+                // Dynamic title: show generated title or fallback
+                title: chatSessionsViewModel.currentSession?.title ?? "Novo Chat",
                 subtitle: nil,
                 onSidebarTap: {
                     print("[NewChatScreen] Hamburger tapped, setting showingSidebar = true and dismissing overlay")

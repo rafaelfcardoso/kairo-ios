@@ -79,4 +79,25 @@ final class ClaudeLLMService {
             }
         }.resume()
     }
+
+    /// Generate a concise title for a chat session based on conversation history
+    /// - Parameters:
+    ///   - messages: The conversation history as ClaudeMessage (user and assistant turns)
+    ///   - completion: Completion handler with the generated title or error
+    func generateTitleForChatSession(messages: [ClaudeMessage], completion: @escaping (Result<String, Error>) -> Void) {
+        // Combine instruction and conversation into a single user prompt
+        let instruction = "Given the following conversation, generate a concise and descriptive title (max 8 words) that summarizes the main topic. Respond with only the title and nothing else."
+        let conversation = messages.map { "\($0.role): \($0.content)" }.joined(separator: "\n\n")
+        let prompt = instruction + "\n\n" + conversation
+        // Delegate to sendMessage to avoid unsupported roles
+        sendMessage(prompt) { result in
+            switch result {
+            case .success(let reply):
+                let trimmed = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+                completion(.success(trimmed))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
 }

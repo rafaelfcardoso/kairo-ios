@@ -5,16 +5,15 @@ struct AppMainView: View {
     @ObservedObject var taskViewModel: TaskViewModel
     @ObservedObject var focusViewModel: FocusSessionViewModel
     @ObservedObject var projectViewModel: ProjectViewModel
+    @ObservedObject var chatSessionsViewModel: ChatSessionsViewModel    
     @StateObject var keyboardHandler = KeyboardHeightHandler()
     @ObservedObject var chatViewModel: GlobalChatViewModel
-    @StateObject var chatSessionsViewModel = ChatSessionsViewModel()
     @Binding var showingSidebar: Bool
     @Binding var selectedProject: Project?
     @Binding var selectedTab: Tab
     @Binding var isAuthenticated: Bool
     @State private var activeChatSession: ChatSession? = nil
     @State private var showingNewChatOverlay: Bool = false
-    @StateObject private var newChatViewModel = GlobalChatViewModel()
     @StateObject private var authViewModel = AuthViewModel()
     
     var body: some View {
@@ -34,7 +33,7 @@ struct AppMainView: View {
                             },
                             onNewChat: {
                                 showingNewChatOverlay = true
-                                newChatViewModel.inputText = ""
+                                chatViewModel.inputText = ""
                             }
                         )
                         .environmentObject(projectViewModel)
@@ -91,7 +90,7 @@ struct AppMainView: View {
 
                 // New Chat Overlay (ChatGPT-style)
                 if showingNewChatOverlay {
-                    NewChatScreen(showingSidebar: $showingSidebar, showingNewChatOverlay: $showingNewChatOverlay, chatSessionsViewModel: chatSessionsViewModel, chatViewModel: newChatViewModel)
+                    NewChatScreen(showingSidebar: $showingSidebar, showingNewChatOverlay: $showingNewChatOverlay, chatSessionsViewModel: chatSessionsViewModel, chatViewModel: chatViewModel)
                         .background(
                             Color(.systemBackground)
                                 .opacity(0.98)
@@ -114,6 +113,13 @@ struct AppMainView: View {
                         .animation(.easeInOut, value: showingSidebar)
                         .animation(Animation.easeOut(duration: 0.25), value: keyboardHandler.keyboardHeight)
                         .allowsHitTesting(!showingSidebar)
+                        .onReceive(chatViewModel.$shouldPresentNewChatOverlay) { shouldPresent in
+                            if shouldPresent {
+                                showingNewChatOverlay = true
+                                chatViewModel.shouldPresentNewChatOverlay = false // Reset after handling
+                            }
+                        }
+
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
