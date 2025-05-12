@@ -24,63 +24,216 @@ The app must show a login modal when an API call returns 401 Unauthorized. Curre
 
 # Project Status Board
 
-- [x] Create folders in Xcode following the Target Directory Layout (verify in Xcode navigator).
-  - [Completed automatically by Executor at 2025-04-29T12:09:14-03:00]
-- [x] Add Swift SDK dependency `modelcontextprotocol/swift-sdk` ≥ 0.7.1 (verify package resolves).
-  - [Completed by Executor at 2025-04-29T14:01:17-03:00]
-- [x] Implement `ZenithMCP` helper in `Data/MCP` to initialize `HTTPClientTransport` and `Client` (verify helper compiles and exposes singleton API).
-  - [Completed by Executor at 2025-04-29T14:01:17-03:00]
-- [x] Resolve Xcode build errors: multiple commands producing Info.plist and .keep (ensure only one build phase copies Info.plist, and .keep files are not included in Copy Bundle Resources).
-  - [Completed by Executor at 2025-05-02T10:48:06-03:00]
-- [x] MCP backend endpoints and checklist from mcp-backend-integration.md are complete and ready for integration.
-- [x] Protocol-oriented repositories and use cases for Task entity are implemented (MCP-backed, not yet wired to UI).
-- [x] **Validate current application build:** - Attempt to build the app in Xcode. - If build errors occur, document and resolve them before starting further MCP integration.
-- [x] **Integrate Claude Haiku 3.5 LLM API as chat assistant backend**
-  - [x] Securely store and use Claude API credentials.
-  - [x] Implement networking to send user chat messages to Claude.
-  - [x] Receive and display LLM responses in the chat UI (console for now).
-  - [x] Parse and handle tool call instructions (e.g., `create-task`).
-- [x] **Implement ChatGPT-style New Chat Flow (GlobalChatInput & NewChatScreen UI and logic):**
+---
 
-  - [x] Update `GlobalChatViewModel` to support new chat session creation from the global chat input.
-  - [x] On user prompt submission, create a new `ChatSession` and add the user's message.
-  - [x] Transition UI to `NewChatScreen` with the new session active.
-  - [x] Display user's message and AI response in the new session.
-  - [x] Ensure session is added to chat history and accessible from sidebar.
-  - [ ] Animate the transition for a seamless experience.
-  - [ ] After the LLM responds, generate an appropriate title for the chat session (using either the first user message or an LLM-generated summary) and update the session in the sidebar.
-  - [ ] Persist chat sessions locally (Phase 1: Local-only, no backend sync yet)
-  - Save all chat sessions to local storage (UserDefaults, Codable, or similar)
-  - Load sessions on app launch and update sidebar accordingly
-  - Remove from storage when deleted in UI
-  - Ensure persistence is robust against app restarts
-  - See implementation plan below
+### Core Infrastructure
 
-  - **Success Criteria:**
-    - User prompt in global input creates a new chat session.
-    - UI transitions to `NewChatScreen` with the session active.
-    - User and AI messages appear correctly.
-    - New session is tracked in chat history/sidebar.
-    - Session title is generated after LLM response and shown in sidebar.
-    - Visual and functional flow matches ChatGPT-style UX.
+- [x] Create folders in Xcode following the Target Directory Layout
 
-- [ ] Test the chat-driven task creation end-to-end.
-- [ ] Document changes and update scratchpad/architecture docs as needed.
-- [ ] Create Repositories and UseCases with protocol-oriented abstractions (verify Presentation layer has no direct MCP imports).
-  - [In progress: Executor]
-- [ ] Refactor ViewModels to invoke UseCases instead of direct service calls (verify build success).
-- [ ] Update `AppState` DI container wiring repositories → use cases → view models (verify dependencies injected).
-- [ ] **Robustness, UX, and Maintainability Enhancements (Phase 1)**
-  - [ ] Define & enforce a UI state machine for chat flow (`ChatFlowState` enum, refactor flags).
-  - [ ] Extract shared ChatInputField with matchedGeometryEffect.
-  - [ ] Implement accessibility checks and graceful animation degradation.
-  - [ ] Add loading skeleton, shimmer, and offline retry UX for chat.
-  - [ ] Write snapshot tests for key chat transitions.
-  - [ ] Document new flow/state machine in scratchpad and architecture docs.
-- [ ] **Premium Polish & Performance (Phase 2)**
+  - Status: Done
+  - Agent: Executor
+  - Success Criteria: All folders present and matched to target layout in Xcode navigator.
+  - Dependencies: None
+  - Completed: 2025-04-29T12:09:14-03:00
+
+- [x] Add Swift SDK dependency `modelcontextprotocol/swift-sdk` ≥ 0.7.1
+
+  - Status: Done
+  - Agent: Executor
+  - Success Criteria: SDK resolves in Xcode and is available for import.
+  - Dependencies: None
+  - Completed: 2025-04-29T14:01:17-03:00
+
+- [x] Implement `ZenithMCP` helper in `Data/MCP` to initialize `HTTPClientTransport` and `Client`
+
+  - Status: Done
+  - Agent: Executor
+  - Success Criteria: Helper compiles and exposes singleton API.
+  - Dependencies: Swift SDK
+  - Completed: 2025-04-29T14:01:17-03:00
+
+- [x] Resolve Xcode build errors: Info.plist/.keep
+
+  - Status: Done
+  - Agent: Executor
+  - Success Criteria: Build succeeds, no duplicate Info.plist or .keep issues.
+  - Dependencies: None
+  - Completed: 2025-05-02T10:48:06-03:00
+
+- [x] MCP backend endpoints and checklist implemented
+
+  - Status: Done
+  - Agent: Executor
+  - Success Criteria: All endpoints available and checklist items complete.
+  - Dependencies: MCP backend
+
+- [x] Protocol-oriented repositories and use cases for Task entity
+
+  - Status: Done
+  - Agent: Executor
+  - Success Criteria: Protocols implemented, MCP-backed, not yet wired to UI.
+  - Dependencies: MCP backend
+
+- [x] Validate current application build
+  - Status: Done
+  - Agent: Executor
+  - Success Criteria: App builds in Xcode without errors.
+  - Dependencies: Above infrastructure
+
+---
+
+### Chat & Session Features
+
+- [x] Integrate Claude Haiku 3.5 LLM API as chat assistant backend
+
+  - Status: Done
+  - Agent: Executor
+  - Success Criteria: Securely store Claude API credentials, send/receive messages, parse tool calls.
+  - Dependencies: Claude API
+
+- [x] Implement ChatGPT-style New Chat Flow (GlobalChatInput & NewChatScreen)
+
+  - Status: Done
+  - Agent: Executor
+  - Success Criteria: User can start new chat, UI transitions, messages display, session added to history/sidebar.
+  - Dependencies: Claude LLM integration
+
+- [ ] Animate the transition for a seamless experience
+
+  - Status: To Do
+  - Agent: Executor
+  - Success Criteria: UI transitions between chat states are animated and visually smooth.
+  - Dependencies: Chat session UI
+
+- [x] Fix: Selecting a past chat session from the sidebar always opens the correct chat overlay/modal
+
+  - Success Criteria: When the user selects any chat session from the sidebar, the chat overlay/modal is presented and displays the correct session, regardless of the current view or navigation state. This works reliably after navigation, app restarts, and across all main screens.
+  - Dependencies: ChatSessionsViewModel, SidebarMenu, chat overlay/modal logic
+
+  **Background and Motivation:**
+  - Users expect a ChatGPT-style navigation: when a chat is selected from the sidebar, the main content instantly switches to that chat session (no modal, no left-right navigation stack animation). The sidebar should close after selection (like the iOS ChatGPT app). The "New Chat" overlay/modal remains unchanged for now to preserve the current new-chat flow and session title generation.
+
+  **Root Cause:**
+  - The previous implementation used a modal overlay for chat sessions, which is not the desired navigation model. Chat sessions should be part of the main content, not presented modally.
+
+  **Best Practice:**
+  - Use a single source of truth for the current main content (Today, Project, or ChatSession) at the app/root level. Selecting a chat from the sidebar updates this state, and the sidebar closes.
+  - Only use overlays/modals for flows like "New Chat" if necessary.
+
+  **Implementation Steps:**
+  1. Refactor AppMainView so the main content region can display Today, Project, or ChatSession based on app state.
+  2. Remove .fullScreenCover for chat sessions; display chat in the main content area instead.
+  3. Update SidebarMenu's onSelect handler: set the selected chat session and close the sidebar.
+  4. Test: Selecting a chat from the sidebar always updates the main content and closes the sidebar. Switching between Today, Project, and Chat works seamlessly.
+  5. Leave the "New Chat" overlay/modal flow unchanged for now.
+
+- [x] Generate chat session title after LLM response
+
+  - Status: Done
+  - Agent: Executor
+  - Success Criteria: After LLM replies, session title is generated (using first user message or LLM summary) and shown in sidebar.
+  - Dependencies: ClaudeLLMService title generation method
+
+- [x] Persist chat sessions locally (Phase 1: Local-only)
+
+  - Status: Done
+  - Agent: Executor
+  - Success Criteria: All chat sessions are saved to local storage (UserDefaults/Codable), loaded on app launch, and persist after restarts. Deletion in UI removes from storage.
+  - Dependencies: ChatSessionsViewModel persistence
+
+- [ ] Test chat-driven task creation end-to-end
+
+  - Status: To Do
+  - Agent: Executor
+  - Success Criteria: User can create a task via chat, new session is created, and task is added to backend.
+  - Dependencies: Chat session, MCP integration
+
+- [ ] Document changes and update architecture docs
+  - Status: To Do
+  - Agent: Executor
+  - Success Criteria: All changes reflected in scratchpad and architecture docs.
+  - Dependencies: Above features
+
+---
+
+### Architecture & Refactoring
+
+- [ ] Create Repositories and UseCases with protocol-oriented abstractions
+
+  - Status: In Progress
+  - Agent: Executor
+  - Success Criteria: Presentation layer has no direct MCP imports; abstractions in place.
+  - Dependencies: MCP backend, protocol definitions
+
+- [ ] Refactor ViewModels to invoke UseCases instead of direct service calls
+
+  - Status: To Do
+  - Agent: Executor
+  - Success Criteria: ViewModels depend on UseCases only, app builds and runs.
+  - Dependencies: UseCases, repositories
+
+- [ ] Update `AppState` DI container to wire repositories → use cases → view models
+  - Status: To Do
+  - Agent: Executor
+  - Success Criteria: All dependencies injected via DI container, app builds and runs.
+  - Dependencies: Above refactorings
+
+---
+
+### Premium Polish & Performance (Phase 2)
+
+### UX, Robustness, and Testing
+
+- [ ] Define & enforce a UI state machine for chat flow (`ChatFlowState` enum, refactor flags)
+
+  - Status: To Do
+  - Agent: Executor
+  - Success Criteria: Chat flow logic is managed via a single state machine, all flags refactored.
+  - Dependencies: Chat UI
+
+- [ ] Extract shared ChatInputField with matchedGeometryEffect
+
+  - Status: To Do
+  - Agent: Executor
+  - Success Criteria: ChatInputField is reusable and animates smoothly between screens.
+  - Dependencies: Chat UI
+
+- [ ] Implement accessibility checks and graceful animation degradation
+
+  - Status: To Do
+  - Agent: Executor
+  - Success Criteria: App passes accessibility tests, animations degrade gracefully on older devices.
+  - Dependencies: Chat UI, animation
+
+- [ ] Add loading skeleton, shimmer, and offline retry UX for chat
+
+  - Status: To Do
+  - Agent: Executor
+  - Success Criteria: Loading and offline states have skeleton/shimmer, retry works offline.
+  - Dependencies: Chat UI
+
+- [ ] Write snapshot tests for key chat transitions
+
+  - Status: To Do
+  - Agent: Executor
+  - Success Criteria: Snapshot tests cover chat transitions and catch regressions.
+  - Dependencies: Chat UI
+
+- [ ] Document new flow/state machine in scratchpad and architecture docs
+  - Status: To Do
+  - Agent: Executor
+  - Success Criteria: Docs updated to reflect new chat state machine and flow.
+  - Dependencies: Above refactorings
+
+## Implementation Notes
+
+- See previous implementation plan and architecture docs for details on persistence, chat overlay, and sidebar integration.
+- For detailed success criteria and edge cases, refer to the "Success Criteria" and "Implementation Plan" sections below.
+
   - [ ] Instrument MCP client and chat for analytics (latency, errors, retries).
   - [ ] Warm up MCP client on launch for premium users.
   - [ ] Benchmark MCP response times (XCTest or Playground).
+
 - [ ] 1. Audit all networking code (especially in `FocusSessionViewModel`) for cases where 401 errors are mapped to `.invalidResponse` or not mapped at all.
 - [ ] 2. Refactor these cases so that 401 always throws `APIError.unauthorized` (or `.authenticationFailed`).
 - [ ] 3. Ensure all ViewModels that make API calls (especially `FocusSessionViewModel`) set `authViewModel?.requiresLogin = true` on `.unauthorized` and `.authenticationFailed` errors, just like in `TaskViewModel`.
@@ -240,14 +393,6 @@ The user wants to enhance the chat overlay and focus session experience. The Tas
 - [2025-05-10 16:59] The session is now always added to chat history and the sidebar updates as soon as a new chat is started. After the Claude reply, the session title is generated and the sidebar reflects the new title. Debug prints were added for traceability. Next: Animate the transition for a seamless experience.
 
 - The GlobalChatViewModel has been refactored to support new chat session creation via the ChatSessionsViewModel. The next step is to ensure the UI (GlobalChatInput and navigation logic) triggers the transition to the NewChatScreen with the new session active.
-
-- Created NewChatScreen as a unified chat screen with toolbar and global chat input, to be shown when tapping the new chat icon in the sidebar.
-- [ ] Wire up the sidebar menu "new chat" button to present this screen as a global overlay (not navigation stack or modal), similar to ChatGPT.
-- [ ] Ensure chat session is only created after user sends a message; add to history then.
-- [ ] Remove the old chat overlay logic for "new chat" if necessary.
-- [ ] Test for visual and functional consistency.
-- No blockers so far.
-
 - ChatScreen now uses UnifiedToolbar in the navigation bar (via .toolbar), ensuring consistent styling with MainView.
 - Sidebar button is always present and functional, using the same animation and haptic feedback as MainView.
 - Lesson: To ensure toolbar consistency across screens, always render UnifiedToolbar inside the navigation bar using .toolbar { ToolbarItem(placement: .principal) { ... } }.

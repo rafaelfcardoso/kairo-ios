@@ -6,6 +6,7 @@ struct SidebarMenu: View {
     @Environment(\.colorScheme) var colorScheme
     @Binding var isShowingSidebar: Bool
     @Binding var selectedProject: Project?
+    @Binding var activeChatSession: ChatSession?
     @State private var showingCreateProject = false
     @State private var statusBarHeight: CGFloat = 0
     @State private var showingSettingsSheet = false
@@ -13,6 +14,7 @@ struct SidebarMenu: View {
     @ObservedObject var chatSessionsViewModel: ChatSessionsViewModel
     var onSelectChatSession: ((ChatSession) -> Void)?
     var onNewChat: (() -> Void)?
+    var onSelectToday: (() -> Void)?
     
     // Theme colors
     var backgroundColor: Color {
@@ -95,10 +97,13 @@ struct SidebarMenu: View {
                             icon: "filemenu.and.selection",
                             title: "Hoje",
                             count: taskViewModel.tasks.count + taskViewModel.overdueTasks.count,
-                            isSelected: selectedProject == nil
+                            isSelected: selectedProject == nil && activeChatSession == nil
                         ) {
-                            selectedProject = nil
                             withAnimation {
+                                selectedProject = nil
+                                if let clearActiveChat = onSelectToday {
+                                    clearActiveChat()
+                                }
                                 isShowingSidebar = false
                             }
                         }
@@ -193,7 +198,7 @@ struct SidebarMenu: View {
                         // Previous Chats should appear immediately after projects, with consistent padding
                         PreviousChatsSection(
                             previousChats: chatSessionsViewModel.sessions.filter { !$0.messages.isEmpty },
-                            currentSessionId: chatSessionsViewModel.currentSession?.id,
+                            currentSessionId: activeChatSession?.id, // Use activeChatSession from parent
                             onSelect: { session in
                                 chatSessionsViewModel.selectSession(session)
                                 onSelectChatSession?(session)
@@ -362,11 +367,6 @@ struct PreviousChatsSection: View {
                                 .font(.system(size: 16))
                                 .foregroundColor(currentSessionId == session.id ? AppTheme.shared.activeColor : .primary)
                             Spacer()
-                            if session.messages.count > 0 {
-                                Text("\(session.messages.count)")
-                                    .font(.system(.subheadline, design: .rounded))
-                                    .foregroundColor(secondaryTextColor)
-                            }
                         }
                         .padding(.vertical, 12)
                         .padding(.horizontal)
@@ -386,8 +386,14 @@ struct PreviousChatsSection: View {
 #Preview {
     ZStack {
         Color.gray.opacity(0.3).edgesIgnoringSafeArea(.all)
-        SidebarMenu(taskViewModel: TaskViewModel(), isShowingSidebar: .constant(true), selectedProject: .constant(nil), chatSessionsViewModel: ChatSessionsViewModel())
-            .environmentObject(ProjectViewModel())
-            .environmentObject(AuthViewModel())
+        SidebarMenu(
+            taskViewModel: TaskViewModel(),
+            isShowingSidebar: .constant(true),
+            selectedProject: .constant(nil),
+            activeChatSession: .constant(nil),
+            chatSessionsViewModel: ChatSessionsViewModel()
+        )
+        .environmentObject(ProjectViewModel())
+        .environmentObject(AuthViewModel())
     }
 }

@@ -15,6 +15,7 @@ struct AppMainView: View {
     @State private var activeChatSession: ChatSession? = nil
     @State private var showingNewChatOverlay: Bool = false
     @StateObject private var authViewModel = AuthViewModel()
+    // No need for a global chat modal flag; chat is now main content
     
     var body: some View {
         GeometryReader { geometry in
@@ -27,13 +28,19 @@ struct AppMainView: View {
                             taskViewModel: taskViewModel,
                             isShowingSidebar: $showingSidebar,
                             selectedProject: $selectedProject,
+                            activeChatSession: $activeChatSession,
                             chatSessionsViewModel: chatSessionsViewModel,
                             onSelectChatSession: { session in
+                                chatSessionsViewModel.selectSession(session)
                                 activeChatSession = session
+                                withAnimation { showingSidebar = false }
                             },
                             onNewChat: {
                                 showingNewChatOverlay = true
                                 chatViewModel.inputText = ""
+                            },
+                            onSelectToday: {
+                                activeChatSession = nil
                             }
                         )
                         .environmentObject(projectViewModel)
@@ -46,20 +53,29 @@ struct AppMainView: View {
                     // Main content (offset right when sidebar is open)
                     ZStack {
                         Group {
-                            switch selectedTab {
-                            case .today:
-                                MainView(
+                            if let session = activeChatSession {
+                                NewChatScreen(
                                     showingSidebar: $showingSidebar,
-                                    selectedProject: $selectedProject
+                                    showingNewChatOverlay: .constant(false),
+                                    chatSessionsViewModel: chatSessionsViewModel,
+                                    chatViewModel: chatViewModel
                                 )
-                                .environmentObject(taskViewModel)
-                                .environmentObject(focusViewModel)
-                                .environmentObject(projectViewModel)
-                                .environmentObject(keyboardHandler)
-                                .onAppear { taskViewModel.refreshAfterLogin() }
-                            case .blocks:
-                                NavigationStack {
-                                    // ... (existing blocks view code) ...
+                            } else {
+                                switch selectedTab {
+                                case .today:
+                                    MainView(
+                                        showingSidebar: $showingSidebar,
+                                        selectedProject: $selectedProject
+                                    )
+                                    .environmentObject(taskViewModel)
+                                    .environmentObject(focusViewModel)
+                                    .environmentObject(projectViewModel)
+                                    .environmentObject(keyboardHandler)
+                                    .onAppear { taskViewModel.refreshAfterLogin() }
+                                case .blocks:
+                                    NavigationStack {
+                                        // ... (existing blocks view code) ...
+                                    }
                                 }
                             }
                         }
@@ -101,6 +117,9 @@ struct AppMainView: View {
                         .allowsHitTesting(!showingSidebar)
                 }
 
+                // Global Chat Overlay for past sessions (presented via global flag)
+                // (Now moved as a modifier outside the ZStack)
+
                 // Global Chat Input (always at the bottom, slides in/out with main view)
                 if activeChatSession == nil && !focusViewModel.isExpanded {
                     GlobalChatInput(viewModel: chatViewModel)
@@ -125,7 +144,6 @@ struct AppMainView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea(edges: .bottom)
             // --- AUTH MODAL ---
-
             .fullScreenCover(isPresented: $authViewModel.requiresLogin, content: {
                 LoginView()
                     .environmentObject(authViewModel)
@@ -137,6 +155,7 @@ struct AppMainView: View {
             NotificationCenter.default.addObserver(forName: .userDidLogout, object: nil, queue: .main) { _ in
                 isAuthenticated = false
             }
+
         }
     }
 }
