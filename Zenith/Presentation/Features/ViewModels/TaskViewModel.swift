@@ -17,6 +17,7 @@ class TaskViewModel: ObservableObject {
     @Published var lastSuccessfulSync: Date? = nil
     
     weak var authViewModel: AuthViewModel?
+    private let taskService: TaskServiceProtocol // New property for the service
     
     private let baseURL = APIConfig.baseURL
     private var currentTask: Task<Void, Error>? // This is a Swift concurrency task
@@ -32,7 +33,8 @@ class TaskViewModel: ObservableObject {
     private let overdueTasksCacheKey = "cached_overdue_tasks"
     private let lastSyncKey = "last_successful_sync"
     
-    init() {
+    init(taskService: TaskServiceProtocol) { // New init signature
+        self.taskService = taskService      // Assign the injected service
         // Only proceed if authenticated
         guard APIConfig.authToken != nil else {
             print("[TaskViewModel] Not authenticated. Skipping task loading.")
@@ -212,7 +214,7 @@ class TaskViewModel: ObservableObject {
         }
     }
     
-    private func loadTasks(projectId: String? = nil, isRefreshing: Bool = false, forToday: Bool = false) async throws {
+    public func loadTasks(projectId: String? = nil, isRefreshing: Bool = false, forToday: Bool = false) async throws {
         // Check if we have recent data
         if let lastFetch = lastFetchTime, 
            Date().timeIntervalSince(lastFetch) < cacheTimeout,
@@ -766,5 +768,15 @@ class TaskViewModel: ObservableObject {
         if let data = data, let responseString = String(data: data, encoding: .utf8) {
             print("🌐 [Tasks][DEBUG] Response body: \(responseString)")
         }
+    }
+    
+    // New method to create a task using the service
+    public func createNewTask(title: String, description: String?) async throws -> TodoTask {
+        // Basic validation for the title
+        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw NSError(domain: "TaskViewModelError", code: 1, userInfo: nil) // Simplified error
+        }
+        // Call the service to create the task
+        return try await taskService.createTask(title: title, description: description)
     }
 }

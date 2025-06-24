@@ -195,28 +195,40 @@ struct CustomTabBar: View {
 // MARK: - Main App
 @main
 struct ZenithApp: App {
-    @StateObject private var chatSessionsViewModel = ChatSessionsViewModel()
-    @State private var isAuthenticated: Bool
     @StateObject private var authViewModel = AuthViewModel()
+    @StateObject private var taskViewModel: TaskViewModel
+    @StateObject private var chatSessionsViewModel: ChatSessionsViewModel
+    @StateObject private var chatViewModel: GlobalChatViewModel
+    @State private var isAuthenticated: Bool
     init() {
 #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-reset-auth") {
             APIConfig.authToken = nil
         }
 #endif
-        // Initialize AFTER clearing token
         _isAuthenticated = State(initialValue: APIConfig.authToken != nil)
-        let chatSessionsVM = ChatSessionsViewModel()
-        let chatVM = GlobalChatViewModel()
-        chatVM.chatSessionsViewModel = chatSessionsVM
-        _chatSessionsViewModel = StateObject(wrappedValue: chatSessionsVM)
-        _chatViewModel = StateObject(wrappedValue: chatVM)
+
+        // Initialize TaskService and its dependencies
+        let taskRepository = TaskRepositoryMCP()
+        let taskService = TaskService(taskRepository: taskRepository)
+
+        // Initialize TaskViewModel first as other ViewModels might depend on it
+        let initializedTaskViewModel = TaskViewModel(taskService: taskService)
+        _taskViewModel = StateObject(wrappedValue: initializedTaskViewModel)
+
+        // Initialize ChatSessionsViewModel
+        let sessionsVM = ChatSessionsViewModel()
+        _chatSessionsViewModel = StateObject(wrappedValue: sessionsVM)
+
+        // Initialize GlobalChatViewModel and inject dependencies
+        let globalChatVM = GlobalChatViewModel()
+        globalChatVM.chatSessionsViewModel = sessionsVM // Inject ChatSessionsViewModel
+        globalChatVM.taskViewModel = initializedTaskViewModel // Inject the existing TaskViewModel instance
+        _chatViewModel = StateObject(wrappedValue: globalChatVM)
     }
-    @StateObject private var taskViewModel = TaskViewModel()
     @StateObject private var focusViewModel = FocusSessionViewModel()
     @StateObject private var projectViewModel = ProjectViewModel()
     @StateObject private var keyboardHandler = KeyboardHeightHandler() // Track keyboard
-    @StateObject private var chatViewModel: GlobalChatViewModel
     @State private var selectedTab: Tab = .today
     @Environment(\.colorScheme) var colorScheme
     @State private var showingSidebar = false

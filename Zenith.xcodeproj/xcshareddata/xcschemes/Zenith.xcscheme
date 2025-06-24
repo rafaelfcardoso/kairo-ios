@@ -30,11 +30,11 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:ZenithUITests/ZenithUITests.xctestplan"
-            default = "YES">
+            reference = "container:ZenithUITests/ZenithUITests.xctestplan">
          </TestPlanReference>
          <TestPlanReference
-            reference = "container:ZenithTests/ZenithTests.xctestplan">
+            reference = "container:ZenithTests/ZenithTests.xctestplan"
+            default = "YES">
          </TestPlanReference>
       </TestPlans>
    </TestAction>
